@@ -48,33 +48,33 @@ To evaluate the performance of our time series distance computation library, we 
 
 We selected [AEON](https://github.com/aeon-toolkit/aeon) as the primary competitor due to its comprehensive implementation of distance metrics, making it the most suitable for direct comparison. Several other libraries were considered, and while we did not conduct a full benchmark on all datasets, we reported their execution times on a subset of the [UCR Archive datasets](https://www.cs.ucr.edu/%7Eeamonn/time_series_data_2018/).
 
-| Dataset                              | Aeon      | tsdistances | tsdistances PAR | tsdistances GPU |
-|--------------------------------------|-----------|-------------|-----------------|-----------------|
-|ACSF1                       | 8854.71   | 786.84      | 131.36          | 10.10           |
-|Adiac                       | 1811.02   | 181.84      | 14.42           | 6.60            |
-|Beef                        | 77.04     | 7.44        | 3.77            | 0.34            |
-|CBF                         | 88.22     | 9.06        | 0.85            | 0.60            |
-|ChlorineConcentration       | 10674.45  | 1070.61     | 74.84           | 41.98           |
-|CinCECGTorso                | 30180.62  | 2807.16     | 229.49          | 28.03           |
-|CricketX                    | 5252.95   | 516.66      | 40.55           | 13.63           |
-|DiatomSizeReduction         | 117.24    | 11.80       | 1.68            | 0.43            |
-|DistalPhalanxOutlineCorrect | 654.23    | 68.06       | 6.41            | 5.34            |
-|ECG200                      | 35.73     | 3.89        | 0.72            | 0.33            |
-|EthanolLevel                | 311557.03 | 28509.74    | 2033.03         | 283.55          |
-|FreezerRegularTrain         | 7853.39   | 768.72      | 57.35           | 20.68           |
-|FreezerSmallTrain           | 1405.80   | 138.01      | 10.48           | 4.53            |
-|Ham                         | 837.90    | 81.00       | 12.60           | 1.91            |
-|Haptics                     | 16487.36  | 1579.31     | 179.22          | 22.78           |
-|HouseTwenty                 | 4926.42   | 467.69      | 95.01           | 4.81            |
-|ItalyPowerDemand            | 9.99      | 1.12        | 0.14            | 0.29            |
-|MixedShapesSmallTrain       | 50890.02  | 4877.02     | 358.87          | 74.37           |
-|NonInvasiveFetalECGThorax1  | 733747.73 | 70415.83    | 5005.24         | 811.66          |
-|ShapesAll                   | 38197.35  | 3494.29     | 301.04          | 67.61           |
-|Strawberry                  | 6383.30   | 628.60      | 52.32           | 22.43           |
-|UWaveGestureLibraryX        | 76309.38  | 7487.65     | 524.81          | 155.80          |
-|Wafer                       | 31792.18  | 3217.30     | 229.56          | 126.54          |
+|                             | sthread |    par |    gpu |
+|-----------------------------|--------:|-------:|-------:|
+| ACSF1                       |   31.60 |   5.74 |   1.41 |
+| Adiac                       |    5.27 |   0.84 |   1.02 |
+| Beef                        |    0.47 |   0.08 |   0.09 |
+| CBF                         |    1.51 |   0.25 |   0.28 |
+| ChlorineConcentration       |  131.53 |  22.73 |   7.36 |
+| CinCECGTorso                |  524.77 |  86.92 |   7.85 |
+| CricketX                    |   47.93 |   8.35 |   1.82 |
+| DiatomSizeReduction         |    0.59 |   0.09 |   0.24 |
+| DistalPhalanxOutlineCorrect |    2.45 |   0.37 |   0.57 |
+| ECG200                      |    0.28 |   0.04 |   0.05 |
+| EthanolLevel                |  925.06 | 169.63 |  38.18 |
+| FreezerRegularTrain         |  100.48 |  16.94 |   4.69 |
+| FreezerSmallTrain           |   18.54 |   3.18 |   1.11 |
+| Ham                         |    5.43 |   0.93 |   0.45 |
+| Haptics                     |  149.35 |  27.49 |   3.82 |
+| HouseTwenty                 |   65.37 |  11.64 |   1.20 |
+| ItalyPowerDemand            |    0.16 |   0.03 |   0.12 |
+| MixedShapesSmallTrain       |  804.75 | 150.01 |  16.66 |
+| NonInvasiveFetalECGThorax1  | 3398.64 | 724.58 | 107.42 |
+| ShapesAll                   |  312.02 |  54.83 |   6.90 |
+| Strawberry                  |   19.38 |   3.42 |   2.35 |
+| UWaveGestureLibraryX        | 1016.30 | 196.54 |  21.05 |
+| Wafer                       |  462.68 |  81.98 |  16.08 |
 
- Sum of the times (in seconds) taken by each library for each dataset to compute all the distances (Euclidean, ERP, LCSS, DTW, ..., SBD). Excluded from the benchmark `CATCH22 Euclidean` and `MPDist` which were implemented later.  CPU: Intel(R) Core(TM) i9-10980HK GPU: NVIDIA GeForce RTX 4090
+ Computation times (in seconds) of our method across 23 datasets, comparing single-threaded, parallelized, and GPU implementations.
 
 ## Installation
 ### PIP

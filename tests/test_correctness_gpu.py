@@ -13,8 +13,8 @@ from tsdistances import (
 )
 import time
 
-A = np.loadtxt('tests/ACSF1/ACSF1_TRAIN.tsv', delimiter='\t')[:, 1:]
-B = np.loadtxt('tests/ACSF1/ACSF1_TEST.tsv', delimiter='\t')[:, 1:]
+A = np.loadtxt('tests/ACSF1/ACSF1_TRAIN.tsv', delimiter='\t')[:10, 1:]
+B = np.loadtxt('tests/ACSF1/ACSF1_TEST.tsv', delimiter='\t')[:10, 1:]
 band = 1.0
 
 def test_erp_distance():

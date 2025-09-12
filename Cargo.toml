@@ -1,6 +1,6 @@
 [package]
 name = "tsdistances"
-version = "0.1.5"
+version = "0.1.6"
 description = "tsdistances is a Python library (with Rust backend) for computing various pairwise distances between sets of time series data."
 edition = "2024"
 authors = [
@@ -17,9 +17,9 @@ pyo3 = { version = "0.23.5", features = ["extension-module"] }
 rand = "0.8.5"
 rayon = "1.10.0"
 rustfft = "6.3.0"
-tsdistances_gpu = { version = "0.1.0", path = "../tsdistances_gpu", default-features = false }
+#tsdistances_gpu = { version = "0.1.0", path = "../tsdistances_gpu", default-features = false }
 vulkano = "0.35.1"
-# tsdistances_gpu = { git = "https://github.com/albertoazzari/tsdistances_gpu.git", default-features = false }
+tsdistances_gpu = { git = "https://github.com/albertoazzari/tsdistances_gpu.git", default-features = false }
 
 [lib]
 crate-type = ["cdylib"]

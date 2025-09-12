@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "tsdistances"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "catch22",
  "ctrlc",
@@ -1793,6 +1793,7 @@ dependencies = [
 [[package]]
 name = "tsdistances_gpu"
 version = "0.1.0"
+source = "git+https://github.com/albertoazzari/tsdistances_gpu.git#ea5314e7d96bfca3cb384abc981f20af0f3fdd2b"
 dependencies = [
  "bytemuck",
  "dashmap",

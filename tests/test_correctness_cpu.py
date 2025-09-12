@@ -105,4 +105,3 @@ def test_mp_distance():
         for j in range(B.shape[0]):
             D_stumpy[i, j] = stumpy.mpdist(A[i], B[j], m=window)
     assert np.allclose(D, D_stumpy, atol=1e-8)
-

@@ -3,11 +3,13 @@ import numpy as np
 from tsdistances import (
     euclidean_distance,
     erp_distance,
+    dtw_distance,
     adtw_distance,
     twe_distance,
 )
 from aeon.distances import (
     erp_pairwise_distance,
+    dtw_pairwise_distance,
     adtw_pairwise_distance,
     twe_pairwise_distance,
 )
@@ -17,10 +19,10 @@ import pathlib
 
 UCR_ARCHIVE_PATH = pathlib.Path('../../DATA/ucr')
 BENCHMARKS_DS = ["ACSF1", "Adiac", "Beef", "CBF", "ChlorineConcentration", "CinCECGTorso", "CricketX", "DiatomSizeReduction", "DistalPhalanxOutlineCorrect", "ECG200", "EthanolLevel", "FreezerRegularTrain", "FreezerSmallTrain", "Ham", "Haptics", "HouseTwenty", "ItalyPowerDemand", "MixedShapesSmallTrain", "NonInvasiveFetalECGThorax1", "ShapesAll", "Strawberry", "UWaveGestureLibraryX", "Wafer"]
-TSDISTANCES = [erp_distance, adtw_distance]
-AEONDISTANCES = [erp_pairwise_distance, adtw_pairwise_distance]
-# TSDISTANCES = [dtw_distance]
-# AEONDISTANCES = [dtw_distance]
+# TSDISTANCES = [erp_distance, adtw_distance]
+# AEONDISTANCES = [erp_pairwise_distance, adtw_pairwise_distance]
+TSDISTANCES = [dtw_distance]
+AEONDISTANCES = [dtw_distance]
 MODALITIES = ["", "par", "gpu"]
 
 def load_benchmark():
@@ -67,7 +69,7 @@ def test_draw_scatter_ucr():
         if is_benchmark[i] == "B":
             if i not in [43, 44]:  # Exclude the last two datasets for clarity
                 plt.text(
-                    ds_size[i], 
+                    ds_size[i],
                     ucr_info[i, 2],
                     str(i+1),
                     ha = 'center',
@@ -78,7 +80,7 @@ def test_draw_scatter_ucr():
             else:
                 if flag:
                     plt.text(
-                        ds_size[i], 
+                        ds_size[i],
                         ucr_info[i, 2],
                         f"[44-45]",
                         ha = 'center',
@@ -109,6 +111,8 @@ def test_tsdistances():
     aeon_times = np.full((len(DATASETS_PATH), len(TSDISTANCES)), np.nan)
 
     for i, dataset in enumerate(DATASETS_PATH):
+        if dataset.name != "NonInvasiveFetalECGThorax1":
+            continue
         print(f"\nDataset: {dataset.name}")
         train = np.loadtxt(dataset / f"{dataset.name}_TRAIN.tsv", delimiter="\t")
         test = np.loadtxt(dataset / f"{dataset.name}_TEST.tsv", delimiter="\t")
@@ -130,19 +134,20 @@ def test_tsdistances():
                 start = time.time()
                 D_gpu = tsdist(X_train, X_test, device='gpu')
                 end = time.time()
+                print(end - start)
                 tsdistances_times[i, j, 2] = end - start
             # AEON distances
             start = time.time()
             D_aeon = aeondist(X_train, X_test)
             end = time.time()
             aeon_times[i, j] = end - start
-            
-            print(f"\t{tsdist.__name__} - \n\t\tTime: {tsdistances_times[i, j, 0]:.4f} (s), {tsdistances_times[i, j, 1]:.4f} (p), {tsdistances_times[i, j, 2]:.4f} (gpu) | AEON: {aeon_times[i, j]:.4f}")
-            # if not np.allclose(D, D_par):
-            #     print("Parallel and single-threaded results do not match")
 
-            # if not np.allclose(D, D_aeon):
-            #     print("AEON and tsdistances results do not match")
+            print(f"\t{tsdist.__name__} - \n\t\tTime: {tsdistances_times[i, j, 0]:.4f} (s), {tsdistances_times[i, j, 1]:.4f} (p), {tsdistances_times[i, j, 2]:.4f} (gpu) | AEON: {aeon_times[i, j]:.4f}")
+            if not np.allclose(D, D_par):
+                print("Parallel and single-threaded results do not match")
+
+            if not np.allclose(D, D_aeon):
+                print("AEON and tsdistances results do not match")
 
             np.save("times_tsdistances.npy", tsdistances_times)
             np.save("times_aeon.npy", aeon_times)

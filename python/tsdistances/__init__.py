@@ -4,7 +4,9 @@ from tsdistances import tsdistances as tsd
 import numpy as np
 
 
-def check_input(u: np.ndarray, v: Optional[np.ndarray] = None) -> Union[np.ndarray, Optional[np.ndarray]]:
+def check_input(
+    u: np.ndarray, v: Optional[np.ndarray] = None
+) -> Union[np.ndarray, Optional[np.ndarray]]:
     if u.ndim == 1:
         if v is None:
             raise ValueError("If `u` is 1-D, `v` must be not None.")
@@ -34,11 +36,10 @@ def check_input(u: np.ndarray, v: Optional[np.ndarray] = None) -> Union[np.ndarr
     else:
         raise ValueError("`u` must be 1-D or 2-D.")
 
+
 @typechecked
 def euclidean_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
-    par: Optional[int] = 1
+    u: np.ndarray, v: Optional[np.ndarray] = None, par: Optional[int] = 1
 ) -> Union[np.ndarray, float]:
     """
     Computes the Euclidean distance between two 1-D arrays or between two sets of 1-D arrays.
@@ -83,6 +84,7 @@ def euclidean_distance(
             _v = v
 
     return np.array(tsd.euclidean(_u, _v, par))
+
 
 @typechecked
 def catcheucl_distance(
@@ -190,6 +192,7 @@ def erp_distance(
                 return np.array(tsd.erp(_u, _v, band, gap_penalty, par, device))
             elif _v.shape[0] >= 2:
                 return np.array(tsd.erp(_u, _v, band, gap_penalty, par, device))
+
 
 @typechecked
 def lcss_distance(
@@ -365,6 +368,7 @@ def ddtw_distance(
                 return np.array(tsd.ddtw(_u, _v, band, par, device))
             elif _v.shape[0] >= 2:
                 return np.array(tsd.ddtw(_u, _v, band, par, device))
+
 
 @typechecked
 def wdtw_distance(
@@ -719,6 +723,7 @@ def sb_distance(
             elif _v.shape[0] >= 2:
                 return np.array(tsd.sb(_u, _v, par))
 
+
 def mp_distance(
     u: np.ndarray,
     window: Optional[int] = 20,
@@ -777,6 +782,7 @@ def mp_distance(
             elif _v.shape[0] >= 2:
                 return np.array(tsd.mp(_u, window, _v, par))
 
+
 __all__ = [
     "euclidean",
     "catch_euclidean",
@@ -790,5 +796,5 @@ __all__ = [
     "msm",
     "twe",
     "sb",
-    "mp"
+    "mp",
 ]

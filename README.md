@@ -144,15 +144,15 @@ Notes
 
 Important: Results will differ between CPU and GPU due to f64ing-point precision:
 
-    CPU computations use f6464 (double precision) for higher numerical accuracy.
+    CPU computations use f64 (double precision) for higher numerical accuracy.
 
-    GPU computations use f6432 (single precision) for better performance.
+    GPU computations use f32 (single precision) for better performance.
     For instance, on an RTX 4090:
 
         FP32 performance: 82.58 TFLOPS
 
         FP64 performance: 1.29 TFLOPS (1:64 rate)
-        Using f6432 on GPU drastically improves speed but introduces small numerical differences compared to CPU results.
+        Using f32 on GPU drastically improves speed but introduces small numerical differences compared to CPU results.
 
 ## Testing and Validation
 

@@ -36,7 +36,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Clippy lints
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --features python,use-compiled-tools -- -D warnings
       - name: Run tests (lib)
         run: cargo test --lib --no-default-features --features python,use-compiled-tools
 

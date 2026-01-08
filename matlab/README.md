@@ -1,6 +1,29 @@
-# TSDistances MATLAB Bindings
+# TSDDistances MATLAB Bindings
 
 MATLAB bindings for the `tsdistances` Rust library, providing efficient computation of various time series distance measures.
+
+**New!** This build system now includes automatic dependency checking and installation guidance.
+
+## Quick Start
+
+1. **Install Dependencies** (first time only):
+   - **macOS/Linux**: Run `bash install_dependencies.sh` in terminal
+   - **Windows**: Run `install_dependencies.bat` in Command Prompt
+   - See [INSTALLATION_GUIDE.md](#documentation) for detailed instructions
+
+2. **Build in MATLAB**:
+   ```matlab
+   cd /path/to/tsdistances/matlab
+   build_tsdistances
+   ```
+   The script automatically checks dependencies and guides installation if needed.
+
+3. **Verify**:
+   ```matlab
+   X = rand(50, 100);
+   D = tsd_dtw(X);
+   disp(size(D));  % Should be 50x50
+   ```
 
 ## Available Distance Functions
 
@@ -22,220 +45,226 @@ MATLAB bindings for the `tsdistances` Rust library, providing efficient computat
 
 ## Requirements
 
+### Required
 - **MATLAB** R2018a or later (with MEX compiler configured)
-- **Rust** toolchain (1.70+)
-- **C Compiler** (Xcode Command Line Tools on macOS, GCC on Linux, MSVC on Windows)
+- **Rust** toolchain (includes `cargo` and `rustc`)
+- **C Compiler**:
+  - macOS: Xcode Command Line Tools
+  - Linux: GCC (via `build-essential`, etc.)
+  - Windows: Microsoft Visual C++ (Visual Studio Build Tools)
 
-## Installation
+### Optional
+- **Vulkan SDK** for GPU acceleration (tsdistances_gpu)
 
-### Quick Install
+## Documentation
 
-1. Navigate to the `matlab` directory in MATLAB:
-   ```matlab
-   cd /path/to/tsdistances/matlab
-   ```
+This directory includes comprehensive setup documentation:
 
-2. Run the build script:
-   ```matlab
-   build_tsdistances
-   ```
+| Document | Purpose |
+|----------|---------|
+| [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) | Step-by-step setup for all platforms |
+| [DEPENDENCIES.md](DEPENDENCIES.md) | Complete dependency reference and versions |
+| [install_dependencies.sh](install_dependencies.sh) | Auto-installer for macOS/Linux |
+| [install_dependencies.bat](install_dependencies.bat) | Checker script for Windows |
+| `build_tsdistances.m` | Build script with auto-dependency checking |
 
-3. (Optional) Save the path permanently:
-   ```matlab
-   savepath
-   ```
+**Start with [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) for setup!**
 
-### Manual Installation
+## Installation by Platform
 
-If the automatic build fails, you can build manually:
+### macOS
+```bash
+# 1. Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
 
-1. Build the Rust library (with MATLAB features, no Python dependencies):
-   ```bash
-   cd /path/to/tsdistances
-   cargo build --release --no-default-features --features matlab,use-compiled-tools
-   ```
+# 2. Install Xcode Command Line Tools
+xcode-select --install
 
-2. Compile the MEX file (in MATLAB):
-   ```matlab
-   % On macOS/Linux with static library:
-   mex -R2018a matlab/tsd_mex.c ./target/release/libtsdistances.a -Imatlab
-   
-   % On Windows:
-   mex matlab/tsd_mex.c ./target/release/tsdistances.lib -Imatlab
-   ```
+# 3. Install pkg-config (recommended)
+brew install pkg-config
 
-## Usage
+# 4. Configure MATLAB MEX
+# In MATLAB: mex -setup C
 
-### Basic Usage
+# 5. Build
+cd /path/to/tsdistances/matlab
+build_tsdistances
+```
+
+### Linux (Ubuntu/Debian)
+```bash
+# 1. Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# 2. Install build tools
+sudo apt-get update
+sudo apt-get install build-essential pkg-config libx11-dev libxrandr-dev
+
+# 3. Configure MATLAB MEX
+# In MATLAB: mex -setup C
+
+# 4. Build
+cd /path/to/tsdistances/matlab
+build_tsdistances
+```
+
+### Windows
+1. Download and install [Rust](https://www.rust-lang.org/tools/install)
+2. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/) or Community Edition
+3. In MATLAB: `mex -setup C` (select Microsoft Visual C++)
+4. Run: `build_tsdistances`
+
+## Usage Examples
+
+### Basic DTW Distance
 
 ```matlab
-% Generate random time series data
+% Load or generate time series data
 X = randn(100, 200);  % 100 time series, each of length 200
 
-% Compute pairwise DTW distance matrix
-D = tsd_dtw(X);
-
-% Compute DTW between two sets
-X1 = randn(50, 200);
-X2 = randn(30, 200);
-D = tsd_dtw(X1, X2);  % Returns 50x30 matrix
+% Compute all pairwise DTW distances
+D = tsd_dtw(X);       % Returns 100×100 distance matrix
 ```
 
-### DTW Variants
+### Compare Different Distance Measures
 
 ```matlab
-X = randn(50, 100);
+X = randn(50, 150);
 
-% Standard DTW
-D = tsd_dtw(X);
+% Compute various distances
+D_euc = tsd_euclidean(X);      % Euclidean
+D_dtw = tsd_dtw(X);            % Dynamic Time Warping
+D_erp = tsd_erp(X);            % Edit Distance with Real Penalty
+D_sbd = tsd_sbd(X);            % Shape-Based Distance
 
-% DTW with Sakoe-Chiba band constraint (10% of length)
+% Compare first 5x5 submatrix
+fprintf('Euclidean:\n'); disp(D_euc(1:5, 1:5));
+fprintf('DTW:\n'); disp(D_dtw(1:5, 1:5));
+```
+
+### Matrix Profile (Motif Discovery)
+
+```matlab
+% Single long time series
+ts = randn(1, 1000);
+
+% Compute matrix profile
+mp = tsd_mp(ts, [], 25);  % Window size 25
+
+% Find motif (nearest neighbor pair)
+[~, idx1] = min(mp);
+[~, idx2] = min(mp);  % Call again for second motif
+fprintf('Motif indices: %d, %d\n', idx1, idx2);
+```
+
+### Distance with Band Constraint
+
+```matlab
+X = randn(100, 500);
+
+% DTW with Sakoe-Chiba band (10% of diagonal)
 D = tsd_dtw(X, [], 0.1);
 
-% Derivative DTW
-D = tsd_ddtw(X);
-
-% Weighted DTW
-D = tsd_wdtw(X, [], 1.0, 0.05);  % band=1.0, g=0.05
-
-% Amerced DTW with warp penalty
-D = tsd_adtw(X, [], 1.0, 0.5);  % band=1.0, warp_penalty=0.5
+% Faster but less accurate than full DTW
 ```
 
-### Elastic Distance Measures
+## Files in This Directory
 
-```matlab
-X = randn(50, 100);
-
-% Edit Distance with Real Penalty
-D = tsd_erp(X, [], 1.0, 0.0);  % band=1.0, gap_penalty=0.0
-
-% Longest Common Subsequence
-D = tsd_lcss(X, [], 1.0, 0.5);  % band=1.0, epsilon=0.5
-
-% Move-Split-Merge
-D = tsd_msm(X, [], 1.0);  % cost=1.0
-
-% Time Warp Edit Distance
-D = tsd_twe(X, [], 0.5, 0.5);  % stiffness=0.5, penalty=0.5
-```
-
-### Other Distances
-
-```matlab
-X = randn(50, 100);
-
-% Euclidean distance
-D = tsd_euclidean(X);
-
-% Catch22-based Euclidean distance
-D = tsd_catch_euclidean(X);
-
-% Shape-Based Distance (shift-invariant)
-D = tsd_sbd(X);
-
-% Matrix Profile Distance
-D = tsd_mp(X, [], 25);  % window_size=25
-```
-
-### Parallel Computation
-
-All functions support parallel computation (enabled by default):
-
-```matlab
-X = randn(100, 200);
-
-% Parallel computation (default)
-D = tsd_dtw(X, [], 1.0, true);
-
-% Sequential computation
-D = tsd_dtw(X, [], 1.0, false);
-```
-
-## Function Reference
-
-### tsd_dtw
-
-```matlab
-D = tsd_dtw(X1, X2, band, parallel)
-```
-
-**Inputs:**
-- `X1` - M×N matrix of M time series of length N
-- `X2` - (optional) P×N matrix, or `[]` for pairwise within X1
-- `band` - (optional) Sakoe-Chiba band size [0-1], default: 1.0
-- `parallel` - (optional) enable parallel computation, default: true
-
-**Output:**
-- `D` - Distance matrix (M×M if X2 is empty, M×P otherwise)
-
-### tsd_erp
-
-```matlab
-D = tsd_erp(X1, X2, band, gap_penalty, parallel)
-```
-
-**Inputs:**
-- `X1` - M×N matrix of time series
-- `X2` - (optional) P×N matrix
-- `band` - (optional) Sakoe-Chiba band [0-1], default: 1.0
-- `gap_penalty` - (optional) penalty for gaps, default: 0.0
-- `parallel` - (optional) enable parallel, default: true
-
-### tsd_lcss
-
-```matlab
-D = tsd_lcss(X1, X2, band, epsilon, parallel)
-```
-
-**Inputs:**
-- `X1` - M×N matrix of time series
-- `X2` - (optional) P×N matrix
-- `band` - (optional) Sakoe-Chiba band [0-1], default: 1.0
-- `epsilon` - (optional) matching threshold, default: 1.0
-- `parallel` - (optional) enable parallel, default: true
-
-## Performance Tips
-
-1. **Use parallel computation** for large datasets (enabled by default)
-2. **Use Sakoe-Chiba bands** to speed up DTW variants (e.g., `band=0.1` for 10%)
-3. **Batch operations**: Compute full distance matrices rather than individual distances
-4. **Data layout**: Each row should be one time series
+| File | Description |
+|------|-------------|
+| `build_tsdistances.m` | Main build script (with auto-dependency checking) |
+| `tsd_mex.c` | MEX gateway source code |
+| `tsdistances.h` | C header file for MEX |
+| `example_tsdistances.m` | Usage examples |
+| `INSTALLATION_GUIDE.md` | **→ Start here for setup!** |
+| `DEPENDENCIES.md` | Detailed dependency information |
+| `install_dependencies.sh` | Auto-installer (macOS/Linux) |
+| `install_dependencies.bat` | Dependency checker (Windows) |
+| `README.md` | This file |
 
 ## Troubleshooting
 
-### MEX compilation fails
+### "Cargo not found"
+- Install Rust: https://www.rust-lang.org/tools/install
+- After install, restart your terminal and run: `source $HOME/.cargo/env`
 
-1. Ensure you have a C compiler configured:
-   ```matlab
-   mex -setup
-   ```
+### "MEX compiler not found"
+- In MATLAB, run: `mex -setup C`
+- Select your C compiler from the list
 
-2. On macOS, install Xcode Command Line Tools:
-   ```bash
-   xcode-select --install
-   ```
+### "C compiler not found"
+- **macOS**: `xcode-select --install`
+- **Linux (Ubuntu)**: `sudo apt-get install build-essential`
+- **Windows**: Install Visual Studio Build Tools
 
-### Library not found at runtime
+### Build fails with Vulkan errors
+- GPU support is optional; build will complete without Vulkan
+- To enable GPU: Download Vulkan SDK from https://vulkan.lunarg.com/sdk/home
 
-On macOS/Linux, ensure the library path is set:
-```matlab
-setenv('DYLD_LIBRARY_PATH', '/path/to/tsdistances/target/release');
-```
+### MEX compilation error on macOS
+- Ensure MATLAB is configured with Xcode Command Line Tools:
+  ```matlab
+  mex -setup C
+  ```
+- Verify Xcode tools are installed: `xcode-select --install`
 
-Or copy the library to the MATLAB directory (done automatically by `build_tsdistances`).
+**For more troubleshooting, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md#troubleshooting-reference).**
 
-### Rust build fails
+## Build System Details
 
-Ensure Rust is installed:
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
+### Automatic Dependency Checking
+
+The `build_tsdistances.m` script now:
+1. **Detects your platform** (macOS, Linux, Windows)
+2. **Checks required tools**: Rust, MATLAB MEX, C compiler
+3. **Verifies optional components**: Vulkan SDK, pkg-config
+4. **Provides installation guidance** if anything is missing
+5. **Builds the Rust library** in release mode
+6. **Compiles MEX files** with correct linker settings
+7. **Sets up MATLAB path** for easy access
+
+### Build Optimization
+
+- **Rust**: Compiled with LTO (Link Time Optimization), O3 optimization
+- **Parallel**: Uses Rayon for CPU parallelization
+- **GPU**: Optional Vulkan support for GPU acceleration
+- **Static linking**: Prefers static libraries when available
+
+## Performance Notes
+
+- **Parallel by default**: All functions use all available CPU cores
+- **Memory usage**: Distance matrix D is N×N, requiring ~8N² bytes
+  - 1,000 time series: ~8 MB
+  - 10,000 time series: ~800 MB
+  - 100,000 time series: ~80 GB
+- **GPU acceleration**: Available with Vulkan SDK (significant speedup for large datasets)
 
 ## License
 
 This project is licensed under the same terms as the main tsdistances library.
+See [LICENSE](../LICENSE) in the project root.
 
 ## Citation
 
-If you use this library in your research, please cite the relevant papers for each distance measure (see the table above).
+If you use tsdistances in your research, please cite:
+
+```bibtex
+@software{azzari2024tsdistances,
+  title={tsdistances: Time Series Distance Library (Rust backend)},
+  author={Azzari, Alberto and others},
+  year={2024},
+  url={https://github.com/albertoazzari/tsdistances}
+}
+```
+
+And the original papers for each distance measure (see table above).
+
+## Support
+
+- **Issues**: https://github.com/albertoazzari/tsdistances/issues
+- **Documentation**: See [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)
+- Include MATLAB version (`version` in MATLAB), OS, and full error messages
+
+

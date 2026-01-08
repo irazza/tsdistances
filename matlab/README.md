@@ -49,20 +49,19 @@ MATLAB bindings for the `tsdistances` Rust library, providing efficient computat
 
 If the automatic build fails, you can build manually:
 
-1. Build the Rust library:
+1. Build the Rust library (with MATLAB features, no Python dependencies):
    ```bash
    cd /path/to/tsdistances
-   cargo build --release --features matlab
+   cargo build --release --no-default-features --features matlab,use-compiled-tools
    ```
 
 2. Compile the MEX file (in MATLAB):
    ```matlab
-   % On macOS/Linux:
-   mex -R2018a matlab/tsd_mex.c -L./target/release -ltsdistances ...
-       LDFLAGS="$LDFLAGS -Wl,-rpath,'./target/release'"
+   % On macOS/Linux with static library:
+   mex -R2018a matlab/tsd_mex.c ./target/release/libtsdistances.a -Imatlab
    
    % On Windows:
-   mex matlab/tsd_mex.c -L./target/release -ltsdistances
+   mex matlab/tsd_mex.c ./target/release/tsdistances.lib -Imatlab
    ```
 
 ## Usage

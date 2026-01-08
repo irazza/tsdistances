@@ -1,12 +1,24 @@
 pub mod diagonal;
-pub mod distances;
 pub mod matrix;
-pub mod matlab_ffi;
 mod utils;
 
+// Core module with pure Rust implementations (no PyO3 dependency)
+pub mod core;
+
+// Python bindings (only when "python" feature is enabled)
+#[cfg(feature = "python")]
+pub mod distances;
+
+// MATLAB FFI bindings (only when "matlab" feature is enabled)
+#[cfg(feature = "matlab")]
+pub mod matlab_ffi;
+
+#[cfg(feature = "python")]
 use ctrlc;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+#[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "tsdistances")]
 fn py_module(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {

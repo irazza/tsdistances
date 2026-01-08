@@ -87,11 +87,51 @@ If you use pip, you can install tsdistances with:
 ### From Source
 
 This can be done by going through the following steps in sequence:
+
 1. Install the latest [Rust compiler](https://www.rust-lang.org/tools/install)
 2. Install [maturin](https://maturin.rs/): `pip install maturin`
-3. `maturin develop --release` to build the library, if want to build also the gpu part:
-    a. Install [LunarG Vulkan SDK](https://www.lunarg.com/vulkan-sdk/)
-    b. Either install [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools.git) or compile `tsdistances_gpu` with `cargo build --release --no-default-features --use-compiled-tools` 
+3. Build the library:
+   ```bash
+   maturin develop --release
+   ```
+
+#### GPU Support
+
+To build with GPU acceleration:
+
+1. Install [LunarG Vulkan SDK](https://www.lunarg.com/vulkan-sdk/)
+2. Either:
+   - Install [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools.git), or
+   - Use pre-compiled tools with `--features use-compiled-tools`
+
+```bash
+maturin develop --release --features use-compiled-tools
+```
+
+#### Feature Flags
+
+The library uses Cargo feature flags to control what gets compiled:
+
+| Feature | Description | Default |
+|---------|-------------|---------|
+| `python` | Python bindings via PyO3 | ✓ |
+| `matlab` | MATLAB/C FFI bindings | ✗ |
+| `use-compiled-tools` | Use pre-compiled SPIRV tools for GPU | ✓ |
+| `use-installed-tools` | Use system-installed SPIRV tools | ✗ |
+
+For Python development (default):
+```bash
+maturin develop --release
+# or explicitly:
+cargo build --release --features python,use-compiled-tools
+```
+
+For MATLAB bindings only (no Python dependency):
+```bash
+cargo build --release --no-default-features --features matlab,use-compiled-tools
+```
+
+See [matlab/README.md](matlab/README.md) for detailed MATLAB installation instructions. 
 
 ## Usage
 

@@ -27,9 +27,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Install Rust toolchain with components
+        run: |
+          rustup install nightly-2025-06-30
+          rustup component add rustfmt clippy --toolchain nightly-2025-06-30
+          rustup default nightly-2025-06-30
       - uses: Swatinem/rust-cache@v2
       - name: Check formatting
         run: cargo fmt -- --check

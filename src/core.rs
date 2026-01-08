@@ -124,11 +124,7 @@ pub fn compute_distance(
 }
 
 /// Compute Euclidean distance matrix
-pub fn euclidean(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
-    par: bool,
-) -> Result<Vec<Vec<f64>>> {
+pub fn euclidean(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Result<Vec<Vec<f64>>> {
     let distance_matrix = compute_distance(
         |a, b| {
             a.iter()
@@ -165,7 +161,7 @@ pub fn catch_euclidean(
             transformed_x
         })
         .collect::<Vec<Vec<_>>>();
-    
+
     let x2 = if let Some(x2) = x2 {
         Some(
             x2.iter()
@@ -186,7 +182,7 @@ pub fn catch_euclidean(
     } else {
         None
     };
-    
+
     // Z-Normalize on the column-wise
     let mean_x1 = (0..catch22::N_CATCH22)
         .map(|i| {
@@ -272,7 +268,7 @@ pub fn erp(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
     }
-    
+
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
@@ -345,7 +341,7 @@ pub fn lcss(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
     }
-    
+
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
@@ -413,7 +409,7 @@ pub fn dtw(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
     }
-    
+
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
@@ -491,7 +487,7 @@ pub fn wdtw(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
     }
-    
+
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
@@ -582,7 +578,7 @@ pub fn adtw(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
     }
-    
+
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
@@ -660,7 +656,7 @@ pub fn msm(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
     }
-    
+
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
@@ -747,9 +743,9 @@ pub fn twe(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
     }
-    
+
     let delete_addition = stiffness + penalty;
-    
+
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
@@ -821,11 +817,7 @@ pub fn twe(
 }
 
 /// Compute SBD (Shape-Based Distance) distance matrix
-pub fn sbd(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
-    par: bool,
-) -> Result<Vec<Vec<f64>>> {
+pub fn sbd(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Result<Vec<Vec<f64>>> {
     let distance_matrix = compute_distance(
         |a, b| {
             let a = zscore(a);

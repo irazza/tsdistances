@@ -129,7 +129,8 @@ pub unsafe extern "C" fn tsd_euclidean(
     x2_cols: usize,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::euclidean(x1, x2, parallel) {
         Ok(result) => DistanceResult::success(result),
@@ -151,7 +152,8 @@ pub unsafe extern "C" fn tsd_catch_euclidean(
     x2_cols: usize,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::catch_euclidean(x1, x2, parallel) {
         Ok(result) => DistanceResult::success(result),
@@ -175,7 +177,8 @@ pub unsafe extern "C" fn tsd_erp(
     gap_penalty: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::erp(x1, x2, sakoe_chiba_band, gap_penalty, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -199,7 +202,8 @@ pub unsafe extern "C" fn tsd_lcss(
     epsilon: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::lcss(x1, x2, sakoe_chiba_band, epsilon, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -222,7 +226,8 @@ pub unsafe extern "C" fn tsd_dtw(
     sakoe_chiba_band: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::dtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -245,7 +250,8 @@ pub unsafe extern "C" fn tsd_ddtw(
     sakoe_chiba_band: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::ddtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -269,7 +275,8 @@ pub unsafe extern "C" fn tsd_wdtw(
     g: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::wdtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -293,7 +300,8 @@ pub unsafe extern "C" fn tsd_wddtw(
     g: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::wddtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -317,7 +325,8 @@ pub unsafe extern "C" fn tsd_adtw(
     warp_penalty: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::adtw(x1, x2, sakoe_chiba_band, warp_penalty, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -340,7 +349,8 @@ pub unsafe extern "C" fn tsd_msm(
     cost: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::msm(x1, x2, cost, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -364,7 +374,8 @@ pub unsafe extern "C" fn tsd_twe(
     penalty: f64,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::twe(x1, x2, 1.0, stiffness, penalty, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
@@ -386,7 +397,8 @@ pub unsafe extern "C" fn tsd_sbd(
     x2_cols: usize,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::sbd(x1, x2, parallel) {
         Ok(result) => DistanceResult::success(result),
@@ -409,7 +421,8 @@ pub unsafe extern "C" fn tsd_mp(
     window_size: usize,
     parallel: bool,
 ) -> DistanceResult {
-    let (x1, x2) = unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+    let (x1, x2) =
+        unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::mp(x1, x2, window_size as i32, parallel) {
         Ok(result) => DistanceResult::success(result),

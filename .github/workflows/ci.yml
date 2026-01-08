@@ -86,7 +86,7 @@ jobs:
       - name: Install and test package
         run: |
           source .venv/bin/activate
-          pip install tsdistances --find-links dist --no-index --force-reinstall
+          pip install tsdistances --find-links dist --force-reinstall
           pytest -v --tb=short tests/test_correctness_cpu.py
 
   macos:
@@ -126,7 +126,7 @@ jobs:
       - name: Install and test package
         run: |
           source .venv/bin/activate
-          pip install tsdistances --find-links dist --no-index --force-reinstall
+          pip install tsdistances --find-links dist --force-reinstall
           pytest -v --tb=short tests/test_correctness_cpu.py
 
   sdist:

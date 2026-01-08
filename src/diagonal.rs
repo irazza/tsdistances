@@ -14,8 +14,8 @@ pub fn diagonal_distance<M: Matrix>(
         b.len(),
         init_val,
         sakoe_chiba_band,
-        |i, j, x, y, z| init_lambda(&a, &b, i, j, x, y, z),
-        |i, j, x, y, z| dist_lambda(&a, &b, i, j, x, y, z),
+        |i, j, x, y, z| init_lambda(a, b, i, j, x, y, z),
+        |i, j, x, y, z| dist_lambda(a, b, i, j, x, y, z),
         use_upper_bound,
     )
 }

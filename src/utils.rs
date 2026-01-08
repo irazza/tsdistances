@@ -6,18 +6,19 @@ pub fn min<T: PartialOrd>(x: T, y: T) -> T {
 pub fn max<T: PartialOrd>(x: T, y: T) -> T {
     if x > y { x } else { y }
 }
+#[allow(dead_code)]
 pub fn next_multiple_of_n(x: usize, n: usize) -> usize {
-    (x + n - 1) / n * n
+    x.div_ceil(n) * n
 }
 
-pub fn derivate(x: &Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+pub fn derivate(x: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let mut x_d = Vec::with_capacity(x.len());
-    for i in 0..x.len() {
-        x_d.push(vec![0.0; x[i].len() - 2]);
+    for item in x {
+        x_d.push(vec![0.0; item.len() - 2]);
     }
-    for i in 0..x.len() {
-        for j in 1..x[i].len() - 1 {
-            x_d[i][j - 1] = ((x[i][j] - x[i][j - 1]) + (x[i][j + 1] - x[i][j - 1]) / 2.0) / 2.0;
+    for (idx, item) in x.iter().enumerate() {
+        for j in 1..item.len() - 1 {
+            x_d[idx][j - 1] = ((item[j] - item[j - 1]) + (item[j + 1] - item[j - 1]) / 2.0) / 2.0;
         }
     }
     x_d
@@ -27,9 +28,8 @@ const WEIGHT_MAX: f64 = 1.0;
 pub fn dtw_weights(len: usize, g: f64) -> Vec<f64> {
     let mut weights = vec![0.0; len];
     let half_len = len as f64 / 2.0;
-    for i in 0..len {
-        weights[i] = WEIGHT_MAX
-            / (1.0 + (std::f64::consts::E as f64).powf(-g * (i as f64 - half_len as f64)));
+    for (i, weight) in weights.iter_mut().enumerate().take(len) {
+        *weight = WEIGHT_MAX / (1.0 + std::f64::consts::E.powf(-g * (i as f64 - half_len)));
     }
     weights
 }

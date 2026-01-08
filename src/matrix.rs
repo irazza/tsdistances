@@ -45,20 +45,20 @@ impl Matrix for FullMatrix {
     fn debug_print(&self) {
         let mut matrix = vec![vec![0.0; self.b_len + 1]; self.a_len + 1];
         let mut row = 0;
-        let mut col = 0;
+        let mut col: isize = 0;
 
-        for i in 0..matrix.len() {
+        for (row_idx, matrix_row) in matrix.iter_mut().enumerate() {
             let mut row1 = row;
             let mut col1 = col;
 
-            for j in 0..matrix[i].len() {
-                matrix[i][j] = self.get_diagonal_cell(row1, col1);
+            for cell in matrix_row.iter_mut() {
+                *cell = self.get_diagonal_cell(row1, col1);
                 row1 += 1;
                 col1 += 1;
-                print!("{:.1}, ", matrix[i][j]);
+                print!("{cell:.1}, ");
             }
             println!();
-            row += 1;
+            row = row_idx + 1;
             col -= 1;
         }
     }
@@ -116,8 +116,7 @@ impl Matrix for CheckMatrix {
 
             assert_eq!(
                 full, optim,
-                "Mismatch at ({}, {}): full={}, optim={}",
-                diag_row, diag_offset, full, optim
+                "Mismatch at ({diag_row}, {diag_offset}): full={full}, optim={optim}"
             );
         }
         full

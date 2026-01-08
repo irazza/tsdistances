@@ -14,8 +14,6 @@ pub mod distances;
 pub mod matlab_ffi;
 
 #[cfg(feature = "python")]
-use ctrlc;
-#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 #[cfg(feature = "python")]

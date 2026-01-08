@@ -106,8 +106,9 @@ fn compute_distance(
     }
 }
 
+#[allow(dead_code)]
 fn next_multiple_of_n(x: usize, n: usize) -> usize {
-    (x + n - 1) / n * n
+    x.div_ceil(n) * n
 }
 
 #[pyfunction]
@@ -144,36 +145,32 @@ pub fn catch_euclidean(
         .map(|x| {
             let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
             for i in 0..catch22::N_CATCH22 {
-                let value = catch22::compute(&x, i);
+                let value = catch22::compute(x, i);
                 if value.is_nan() {
                     transformed_x.push(0.0);
                 } else {
                     transformed_x.push(value);
                 }
             }
-            return transformed_x;
+            transformed_x
         })
         .collect::<Vec<Vec<_>>>();
-    let x2 = if let Some(x2) = x2 {
-        Some(
-            x2.iter()
-                .map(|x| {
-                    let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
-                    for i in 0..catch22::N_CATCH22 {
-                        let value = catch22::compute(&x, i);
-                        if value.is_finite() {
-                            transformed_x.push(value);
-                        } else {
-                            transformed_x.push(0.0);
-                        }
+    let x2 = x2.map(|x2| {
+        x2.iter()
+            .map(|x| {
+                let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
+                for i in 0..catch22::N_CATCH22 {
+                    let value = catch22::compute(x, i);
+                    if value.is_finite() {
+                        transformed_x.push(value);
+                    } else {
+                        transformed_x.push(0.0);
                     }
-                    return transformed_x;
-                })
-                .collect::<Vec<Vec<_>>>(),
-        )
-    } else {
-        None
-    };
+                }
+                transformed_x
+            })
+            .collect::<Vec<Vec<_>>>()
+    });
     // Z-Normalize on the column-wise
     let mean_x1 = (0..catch22::N_CATCH22)
         .map(|i| {
@@ -257,7 +254,7 @@ pub fn erp(
             "Gap penalty must be non-negative",
         ));
     }
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Sakoe-Chiba band must be non-negative and less than 1.0",
         ));
@@ -317,11 +314,11 @@ pub fn erp(
         }
     }
     if let Some(distance_matrix) = distance_matrix {
-        return Ok(distance_matrix);
+        Ok(distance_matrix)
     } else {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        Err(pyo3::exceptions::PyValueError::new_err(
             "Error computing ERP distance",
-        ));
+        ))
     }
 }
 
@@ -342,7 +339,7 @@ pub fn lcss(
             "Epsilon must be non-negative",
         ));
     }
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Sakoe-Chiba band must be non-negative and less than 1.0",
         ));
@@ -404,11 +401,11 @@ pub fn lcss(
         }
     }
     if let Some(distance_matrix) = distance_matrix {
-        return Ok(distance_matrix);
+        Ok(distance_matrix)
     } else {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        Err(pyo3::exceptions::PyValueError::new_err(
             "Error computing LCSS distance",
-        ));
+        ))
     }
 }
 
@@ -422,7 +419,7 @@ pub fn dtw(
     device: Option<&str>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let sakoe_chiba_band = sakoe_chiba_band.unwrap_or(1.0);
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Sakoe-Chiba band must be non-negative and less than 1.0",
         ));
@@ -481,11 +478,11 @@ pub fn dtw(
     }
 
     if let Some(distance_matrix) = distance_matrix {
-        return Ok(distance_matrix);
+        Ok(distance_matrix)
     } else {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        Err(pyo3::exceptions::PyValueError::new_err(
             "Error computing DTW distance",
-        ));
+        ))
     }
 }
 
@@ -499,11 +496,7 @@ pub fn ddtw(
     device: Option<&str>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let x1_d = derivate(&x1);
-    let x2_d = if let Some(x2) = &x2 {
-        Some(derivate(&x2))
-    } else {
-        None
-    };
+    let x2_d = x2.as_ref().map(|x| derivate(x));
     dtw(x1_d, x2_d, sakoe_chiba_band, par, device)
 }
 
@@ -519,7 +512,7 @@ pub fn wdtw(
 ) -> PyResult<Vec<Vec<f64>>> {
     let sakoe_chiba_band = sakoe_chiba_band.unwrap_or(1.0);
     let g = g.unwrap_or(0.05);
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Sakoe-Chiba band must be non-negative and less than 1.0",
         ));
@@ -536,7 +529,7 @@ pub fn wdtw(
                         let wdtw_cost_func =
                             |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
                                 let dist = (a[i] - b[j]).powi(2)
-                                    * weights[(i as i32 - j as i32).abs() as usize];
+                                    * weights[(i as i32 - j as i32).unsigned_abs() as usize];
                                 dist + min(min(z, x), y)
                             };
 
@@ -585,11 +578,11 @@ pub fn wdtw(
     }
 
     if let Some(distance_matrix) = distance_matrix {
-        return Ok(distance_matrix);
+        Ok(distance_matrix)
     } else {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        Err(pyo3::exceptions::PyValueError::new_err(
             "Error computing WDTW distance",
-        ));
+        ))
     }
 }
 
@@ -604,11 +597,7 @@ pub fn wddtw(
     device: Option<&str>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let x1_d = derivate(&x1);
-    let x2_d = if let Some(x2) = &x2 {
-        Some(derivate(&x2))
-    } else {
-        None
-    };
+    let x2_d = x2.as_ref().map(|x| derivate(x));
     wdtw(x1_d, x2_d, sakoe_chiba_band, g, par, device)
 }
 
@@ -622,7 +611,7 @@ pub fn msm(
     device: Option<&str>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let sakoe_chiba_band = sakoe_chiba_band.unwrap_or(1.0);
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Sakoe-Chiba band must be non-negative and less than 1.0",
         ));
@@ -692,11 +681,11 @@ pub fn msm(
     }
 
     if let Some(distance_matrix) = distance_matrix {
-        return Ok(distance_matrix);
+        Ok(distance_matrix)
     } else {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        Err(pyo3::exceptions::PyValueError::new_err(
             "Error computing MSM distance",
-        ));
+        ))
     }
 }
 
@@ -726,7 +715,7 @@ pub fn twe(
     }
     let delete_addition = stiffness + penalty;
 
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Sakoe-Chiba band must be non-negative and less than 1.0",
         ));
@@ -805,11 +794,11 @@ pub fn twe(
     }
 
     if let Some(distance_matrix) = distance_matrix {
-        return Ok(distance_matrix);
+        Ok(distance_matrix)
     } else {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        Err(pyo3::exceptions::PyValueError::new_err(
             "Error computing TWE distance",
-        ));
+        ))
     }
 }
 
@@ -830,7 +819,7 @@ pub fn adtw(
             "Weight must be non-negative",
         ));
     }
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "Sakoe-Chiba band must be non-negative and less than 1.0",
         ));
@@ -890,11 +879,11 @@ pub fn adtw(
     }
 
     if let Some(distance_matrix) = distance_matrix {
-        return Ok(distance_matrix);
+        Ok(distance_matrix)
     } else {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        Err(pyo3::exceptions::PyValueError::new_err(
             "Error computing ADTW distance",
-        ));
+        ))
     }
 }
 
@@ -907,8 +896,8 @@ pub fn sb(
 ) -> PyResult<Vec<Vec<f64>>> {
     let distance_matrix = compute_distance(
         |a, b| {
-            let a = zscore(&a);
-            let b = zscore(&b);
+            let a = zscore(a);
+            let b = zscore(b);
             let cc = cross_correlation(&a, &b);
             1.0 - cc.iter().max_by(|x, y| x.partial_cmp(y).unwrap()).unwrap()
                 / (l2_norm(&a) * l2_norm(&b))
@@ -934,7 +923,7 @@ pub fn mp(
         |a, b| {
             let n_a = a.len();
             let n_b = b.len();
-            let mut p_abba = mp_(&a, &b, window as usize);
+            let mut p_abba = mp_(a, b, window);
             let n = min(
                 (threshold * (n_a + n_b) as f64).ceil() as usize,
                 n_a - window + 1 + n_b - window + 1 - 1,
@@ -959,8 +948,8 @@ fn mp_(a: &[f64], b: &[f64], window: usize) -> Vec<f64> {
     let mut p_ab = vec![f64::INFINITY; n_a - window + 1];
     let mut p_ba = vec![f64::INFINITY; n_b - window + 1];
 
-    let (mean_a, std_a) = mean_std_per_windows(&a, window);
-    let (mean_b, std_b) = mean_std_per_windows(&b, window);
+    let (mean_a, std_a) = mean_std_per_windows(a, window);
+    let (mean_b, std_b) = mean_std_per_windows(b, window);
 
     for (i, sw_a) in a.windows(window).enumerate() {
         for (j, sw_b) in b.windows(window).enumerate() {

@@ -21,8 +21,8 @@ pub enum DistanceError {
 impl std::fmt::Display for DistanceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DistanceError::InvalidParameter(msg) => write!(f, "Invalid parameter: {}", msg),
-            DistanceError::ComputationError(msg) => write!(f, "Computation error: {}", msg),
+            DistanceError::InvalidParameter(msg) => write!(f, "Invalid parameter: {msg}"),
+            DistanceError::ComputationError(msg) => write!(f, "Computation error: {msg}"),
         }
     }
 }
@@ -151,7 +151,7 @@ pub fn catch_euclidean(
         .map(|x| {
             let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
             for i in 0..catch22::N_CATCH22 {
-                let value = catch22::compute(&x, i);
+                let value = catch22::compute(x, i);
                 if value.is_nan() {
                     transformed_x.push(0.0);
                 } else {
@@ -162,26 +162,22 @@ pub fn catch_euclidean(
         })
         .collect::<Vec<Vec<_>>>();
 
-    let x2 = if let Some(x2) = x2 {
-        Some(
-            x2.iter()
-                .map(|x| {
-                    let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
-                    for i in 0..catch22::N_CATCH22 {
-                        let value = catch22::compute(&x, i);
-                        if value.is_finite() {
-                            transformed_x.push(value);
-                        } else {
-                            transformed_x.push(0.0);
-                        }
+    let x2 = x2.map(|x2| {
+        x2.iter()
+            .map(|x| {
+                let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
+                for i in 0..catch22::N_CATCH22 {
+                    let value = catch22::compute(x, i);
+                    if value.is_finite() {
+                        transformed_x.push(value);
+                    } else {
+                        transformed_x.push(0.0);
                     }
-                    transformed_x
-                })
-                .collect::<Vec<Vec<_>>>(),
-        )
-    } else {
-        None
-    };
+                }
+                transformed_x
+            })
+            .collect::<Vec<Vec<_>>>()
+    });
 
     // Z-Normalize on the column-wise
     let mean_x1 = (0..catch22::N_CATCH22)
@@ -263,7 +259,7 @@ pub fn erp(
             "Gap penalty must be non-negative".to_string(),
         ));
     }
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(DistanceError::InvalidParameter(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
@@ -336,7 +332,7 @@ pub fn lcss(
             "Epsilon must be non-negative".to_string(),
         ));
     }
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(DistanceError::InvalidParameter(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
@@ -404,7 +400,7 @@ pub fn dtw(
     par: bool,
     device: &str,
 ) -> Result<Vec<Vec<f64>>> {
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(DistanceError::InvalidParameter(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
@@ -469,7 +465,7 @@ pub fn ddtw(
     device: &str,
 ) -> Result<Vec<Vec<f64>>> {
     let x1_d = derivate(&x1);
-    let x2_d = x2.as_ref().map(|x2| derivate(x2));
+    let x2_d = x2.as_ref().map(|x| derivate(x));
     dtw(x1_d, x2_d, sakoe_chiba_band, par, device)
 }
 
@@ -482,7 +478,7 @@ pub fn wdtw(
     par: bool,
     device: &str,
 ) -> Result<Vec<Vec<f64>>> {
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(DistanceError::InvalidParameter(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
@@ -497,7 +493,7 @@ pub fn wdtw(
                     let wdtw_cost_func =
                         |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
                             let dist = (a[i] - b[j]).powi(2)
-                                * weights[(i as i32 - j as i32).abs() as usize];
+                                * weights[(i as i32 - j as i32).unsigned_abs() as usize];
                             dist + min(min(z, x), y)
                         };
 
@@ -555,7 +551,7 @@ pub fn wddtw(
     device: &str,
 ) -> Result<Vec<Vec<f64>>> {
     let x1_d = derivate(&x1);
-    let x2_d = x2.as_ref().map(|x2| derivate(x2));
+    let x2_d = x2.as_ref().map(|x| derivate(x));
     wdtw(x1_d, x2_d, sakoe_chiba_band, g, par, device)
 }
 
@@ -573,7 +569,7 @@ pub fn adtw(
             "Warp penalty must be non-negative".to_string(),
         ));
     }
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(DistanceError::InvalidParameter(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
@@ -651,7 +647,7 @@ pub fn msm(
     par: bool,
     device: &str,
 ) -> Result<Vec<Vec<f64>>> {
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(DistanceError::InvalidParameter(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));
@@ -738,7 +734,7 @@ pub fn twe(
             "Penalty (lambda) must be non-negative".to_string(),
         ));
     }
-    if sakoe_chiba_band < 0.0 || sakoe_chiba_band > 1.0 {
+    if !(0.0..=1.0).contains(&sakoe_chiba_band) {
         return Err(DistanceError::InvalidParameter(
             "Sakoe-Chiba band must be between 0.0 and 1.0".to_string(),
         ));

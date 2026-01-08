@@ -1,6 +1,7 @@
 pub mod diagonal;
-mod distances;
+pub mod distances;
 pub mod matrix;
+pub mod matlab_ffi;
 mod utils;
 
 use ctrlc;

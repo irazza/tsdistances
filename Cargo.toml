@@ -22,7 +22,7 @@ vulkano = "0.35.1"
 tsdistances_gpu = { git = "https://github.com/albertoazzari/tsdistances_gpu.git", default-features = false }
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "staticlib"]
 name = "tsdistances"
 
 [profile.release]
@@ -39,3 +39,4 @@ use-compiled-tools = [
 use-installed-tools = [
     "tsdistances_gpu/use-installed-tools",
 ]
+matlab = []

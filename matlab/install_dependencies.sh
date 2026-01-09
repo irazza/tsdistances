@@ -29,12 +29,12 @@ if [ "$OS" = "macOS" ]; then
     if ! command -v curl &> /dev/null; then
         if ! command -v brew &> /dev/null; then
             echo "Installing Homebrew..."
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" > /dev/null 2>&1
         fi
-        brew install curl
+        brew install curl > /dev/null 2>&1
     fi
     if ! command -v cargo &> /dev/null; then
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
         source $HOME/.cargo/env
     else
         echo "✓ Rust already installed: $(rustc --version)"
@@ -43,7 +43,7 @@ if [ "$OS" = "macOS" ]; then
     echo ""
     echo "[2/4] Installing Xcode Command Line Tools..."
     if ! command -v clang &> /dev/null; then
-        xcode-select --install
+        xcode-select --install > /dev/null 2>&1
         echo "Please complete the Xcode installation when prompted"
     else
         echo "✓ Xcode Command Line Tools already installed"
@@ -54,9 +54,9 @@ if [ "$OS" = "macOS" ]; then
     if ! command -v pkg-config &> /dev/null; then
         if ! command -v brew &> /dev/null; then
             echo "Homebrew not found. Installing Homebrew..."
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" > /dev/null 2>&1
         fi
-        brew install pkg-config
+        brew install pkg-config > /dev/null 2>&1
     else
         echo "✓ pkg-config already installed"
     fi
@@ -86,22 +86,22 @@ elif [ "$OS" = "Linux" ]; then
     
     if [ "$DISTRO" = "ubuntu" ] || [ "$DISTRO" = "debian" ]; then
         echo "[1/4] Updating package lists..."
-        sudo apt-get update
+        sudo apt-get update > /dev/null 2>&1
         
         echo "[2/4] Installing curl and Rust toolchain..."
-        sudo apt-get install -y curl
+        sudo apt-get install -y curl > /dev/null 2>&1
         if ! command -v cargo &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
             source $HOME/.cargo/env
         else
             echo "✓ Rust already installed: $(rustc --version)"
         fi
         
         echo "[3/4] Installing build tools..."
-        sudo apt-get install -y build-essential pkg-config libx11-dev libxrandr-dev
+        sudo apt-get install -y build-essential pkg-config libx11-dev libxrandr-dev > /dev/null 2>&1
         
         echo "[4/4] Vulkan SDK (optional for GPU support)..."
-        if ! dpkg -l | grep -q libvulkan1; then
+        if ! dpkg -l 2>/dev/null | grep -q libvulkan1; then
             echo "To install Vulkan support, run:"
             echo "  sudo apt-get install vulkan-tools vulkan-headers libvulkan-dev"
         else
@@ -110,20 +110,20 @@ elif [ "$OS" = "Linux" ]; then
         
     elif [ "$DISTRO" = "fedora" ] || [ "$DISTRO" = "rhel" ] || [ "$DISTRO" = "centos" ]; then
         echo "[1/4] Installing curl and Rust toolchain..."
-        sudo yum install -y curl
+        sudo yum install -y curl > /dev/null 2>&1
         if ! command -v cargo &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
             source $HOME/.cargo/env
         else
             echo "✓ Rust already installed: $(rustc --version)"
         fi
         
         echo "[2/4] Installing build tools..."
-        sudo yum groupinstall -y "Development Tools"
-        sudo yum install -y pkg-config libX11-devel libXrandr-devel
+        sudo yum groupinstall -y "Development Tools" > /dev/null 2>&1
+        sudo yum install -y pkg-config libX11-devel libXrandr-devel > /dev/null 2>&1
         
         echo "[3/4] Vulkan SDK (optional for GPU support)..."
-        if ! rpm -q vulkan-tools &> /dev/null; then
+        if ! rpm -q vulkan-tools > /dev/null 2>&1; then
             echo "To install Vulkan support, run:"
             echo "  sudo yum install vulkan-tools vulkan-devel"
         else
@@ -132,19 +132,19 @@ elif [ "$OS" = "Linux" ]; then
         
     elif [ "$DISTRO" = "arch" ]; then
         echo "[1/4] Installing curl and Rust toolchain..."
-        sudo pacman -S --noconfirm curl
+        sudo pacman -S --noconfirm curl > /dev/null 2>&1
         if ! command -v cargo &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
             source $HOME/.cargo/env
         else
             echo "✓ Rust already installed: $(rustc --version)"
         fi
         
         echo "[2/4] Installing build tools..."
-        sudo pacman -S --noconfirm base-devel pkg-config
+        sudo pacman -S --noconfirm base-devel pkg-config > /dev/null 2>&1
         
         echo "[3/4] Vulkan SDK (optional for GPU support)..."
-        if ! pacman -Q vulkan-tools &> /dev/null; then
+        if ! pacman -Q vulkan-tools > /dev/null 2>&1; then
             echo "To install Vulkan support, run:"
             echo "  sudo pacman -S vulkan-headers vulkan-loader"
         else

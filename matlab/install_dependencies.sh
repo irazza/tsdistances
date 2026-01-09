@@ -25,7 +25,14 @@ echo ""
 
 # macOS Installation
 if [ "$OS" = "macOS" ]; then
-    echo "[1/4] Installing Rust toolchain..."
+    echo "[1/4] Installing curl (if needed) and Rust toolchain..."
+    if ! command -v curl &> /dev/null; then
+        if ! command -v brew &> /dev/null; then
+            echo "Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
+        brew install curl
+    fi
     if ! command -v cargo &> /dev/null; then
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         source $HOME/.cargo/env
@@ -81,7 +88,8 @@ elif [ "$OS" = "Linux" ]; then
         echo "[1/4] Updating package lists..."
         sudo apt-get update
         
-        echo "[2/4] Installing Rust toolchain..."
+        echo "[2/4] Installing curl and Rust toolchain..."
+        sudo apt-get install -y curl
         if ! command -v cargo &> /dev/null; then
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             source $HOME/.cargo/env
@@ -101,7 +109,8 @@ elif [ "$OS" = "Linux" ]; then
         fi
         
     elif [ "$DISTRO" = "fedora" ] || [ "$DISTRO" = "rhel" ] || [ "$DISTRO" = "centos" ]; then
-        echo "[1/4] Installing Rust toolchain..."
+        echo "[1/4] Installing curl and Rust toolchain..."
+        sudo yum install -y curl
         if ! command -v cargo &> /dev/null; then
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             source $HOME/.cargo/env
@@ -122,7 +131,8 @@ elif [ "$OS" = "Linux" ]; then
         fi
         
     elif [ "$DISTRO" = "arch" ]; then
-        echo "[1/4] Installing Rust toolchain..."
+        echo "[1/4] Installing curl and Rust toolchain..."
+        sudo pacman -S --noconfirm curl
         if ! command -v cargo &> /dev/null; then
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             source $HOME/.cargo/env

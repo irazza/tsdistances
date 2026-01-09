@@ -34,7 +34,7 @@ if [ "$OS" = "macOS" ]; then
         brew install curl > /dev/null 2>&1
     fi
     if ! command -v cargo &> /dev/null; then
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh > /dev/null 2>&1
         source $HOME/.cargo/env
     else
         echo "✓ Rust already installed: $(rustc --version)"
@@ -91,7 +91,7 @@ elif [ "$OS" = "Linux" ]; then
         echo "[2/4] Installing curl and Rust toolchain..."
         sudo apt-get install -y curl > /dev/null 2>&1
         if ! command -v cargo &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh > /dev/null 2>&1
             source $HOME/.cargo/env
         else
             echo "✓ Rust already installed: $(rustc --version)"
@@ -112,7 +112,7 @@ elif [ "$OS" = "Linux" ]; then
         echo "[1/4] Installing curl and Rust toolchain..."
         sudo yum install -y curl > /dev/null 2>&1
         if ! command -v cargo &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh > /dev/null 2>&1
             source $HOME/.cargo/env
         else
             echo "✓ Rust already installed: $(rustc --version)"
@@ -134,7 +134,7 @@ elif [ "$OS" = "Linux" ]; then
         echo "[1/4] Installing curl and Rust toolchain..."
         sudo pacman -S --noconfirm curl > /dev/null 2>&1
         if ! command -v cargo &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y > /dev/null 2>&1
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh > /dev/null 2>&1
             source $HOME/.cargo/env
         else
             echo "✓ Rust already installed: $(rustc --version)"

@@ -1,4 +1,4 @@
-# TSDDistances MATLAB Bindings
+# tsdistances MATLAB Bindings
 
 MATLAB bindings for the `tsdistances` Rust library, providing efficient computation of various time series distance measures.
 

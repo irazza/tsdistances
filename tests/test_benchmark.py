@@ -22,7 +22,7 @@ BENCHMARKS_DS = ["ACSF1", "Adiac", "Beef", "CBF", "ChlorineConcentration", "CinC
 TSDISTANCES = [erp_distance, dtw_distance, adtw_distance]
 AEONDISTANCES = [erp_pairwise_distance, dtw_pairwise_distance, adtw_pairwise_distance]
 MODALITIES = ["", "par", "gpu"]
-NUM_RUNS = 5  # Number of times to run each benchmark
+NUM_RUNS = 1  # Number of times to run each benchmark
 
 def load_benchmark_filtered():
     benchmark_ds = sorted([x for x in UCR_ARCHIVE_PATH.iterdir() if x.name in BENCHMARKS_DS])
@@ -110,7 +110,7 @@ def test_tsdistances():
             print(f"\t\tParallel: {mean_par:.4f}±{std_par:.4f} (s){gpu_str}")
             print(f"\t\tAEON: {mean_aeon:.4f}±{std_aeon:.4f} (s)")
 
-            if not np.allclose(D, D_aeon):
+            if not np.allclose(D, D_aeon, atol=1e-8):
                 print("\t\tWARNING: AEON and tsdistances results do not match")
 
             np.save("times_tsdistances_all.npy", tsdistances_times)

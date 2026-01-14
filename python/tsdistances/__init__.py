@@ -138,7 +138,7 @@ def erp_distance(
     u: np.ndarray,
     v: Optional[np.ndarray] = None,
     band: Optional[float] = 1.0,
-    gap_penalty: Optional[float] = 1.0,
+    gap_penalty: Optional[float] = 0.0,
     par: Optional[bool] = True,
     device: Optional[str] = "cpu",
 ) -> Union[np.ndarray, float]:

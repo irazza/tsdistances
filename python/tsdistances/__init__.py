@@ -1,12 +1,15 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
+from numpy.typing import ArrayLike
 from typeguard import TypeCheckError, typechecked, check_type
 from tsdistances import tsdistances as tsd
 import numpy as np
 
 
 def check_input(
-    u: np.ndarray, v: Optional[np.ndarray] = None
+    u: ArrayLike, v: Optional[ArrayLike] = None
 ) -> Union[np.ndarray, Optional[np.ndarray]]:
+    u = np.asarray(u)
+    v = None if v is None else np.asarray(v)
     if u.ndim == 1:
         if v is None:
             raise ValueError("If `u` is 1-D, `v` must be not None.")
@@ -39,7 +42,7 @@ def check_input(
 
 @typechecked
 def euclidean_distance(
-    u: np.ndarray, v: Optional[np.ndarray] = None, par: Optional[int] = 1
+    u: ArrayLike, v: Optional[ArrayLike] = None, par: Optional[bool] = True
 ) -> Union[np.ndarray, float]:
     """
     Computes the Euclidean distance between two 1-D arrays or between two sets of 1-D arrays.
@@ -52,8 +55,8 @@ def euclidean_distance(
     v : (N,) array_like or (M, N) array_like, optional
     Input array. If provided, `v` should have the same shape as `u`.
     If `v` is None, pairwise distances within `u` are computed.
-    par : int, optional
-        Number of jobs to use for computation (default is 1).
+    par : bool, optional
+        Enable parallel computation (default is True).
 
     Returns
     -------
@@ -72,23 +75,20 @@ def euclidean_distance(
            [1.        , 0.        ]])
 
     """
-    if u.ndim == 1 and v.ndim == 1:
-        _u = u.reshape((1, u.shape[0]))
-        _v = v.reshape((1, v.shape[0]))
+    _u, _v = check_input(u, v)
 
-    if u.ndim == 2:
-        _u = u
-        if v is None:
-            return np.array(tsd.euclidean(_u, None, par))
-        if v.ndim == 2:
-            _v = v
-
+    if _u.shape[0] == 1:
+        if _v.shape[0] == 1:
+            return tsd.euclidean(_u, _v, par)[0][0]
+        return np.array(tsd.euclidean(_u, _v, par))
+    if _v is None:
+        return np.array(tsd.euclidean(_u, None, par))
     return np.array(tsd.euclidean(_u, _v, par))
 
 
 @typechecked
 def catcheucl_distance(
-    u: np.ndarray, v: Optional[np.ndarray] = None, par: Optional[int] = 1
+    u: ArrayLike, v: Optional[ArrayLike] = None, par: Optional[bool] = True
 ) -> Union[np.ndarray, float]:
     """
     Computes the Catch22-Euclidean distance between two 1-D arrays or between two sets of 1-D arrays.
@@ -101,8 +101,8 @@ def catcheucl_distance(
     v : (N,) array_like or (M, N) array_like, optional
     Input array. If provided, `v` should have the same shape as `u`.
     If `v` is None, pairwise distances within `u` are computed.
-    par : int, optional
-        Number of jobs to use for computation (default is 1).
+    par : bool, optional
+        Enable parallel computation (default is True).
 
     Returns
     -------
@@ -119,24 +119,21 @@ def catcheucl_distance(
     array([[0.0, 1.0], [1.0, 0.0]])
 
     """
-    if u.ndim == 1 and v.ndim == 1:
-        _u = u.reshape((1, u.shape[0]))
-        _v = v.reshape((1, v.shape[0]))
+    _u, _v = check_input(u, v)
 
-    if u.ndim == 2:
-        _u = u
-        if v is None:
-            return np.array(tsd.catch_euclidean(_u, None, par))
-        if v.ndim == 2:
-            _v = v
-
+    if _u.shape[0] == 1:
+        if _v.shape[0] == 1:
+            return tsd.catch_euclidean(_u, _v, par)[0][0]
+        return np.array(tsd.catch_euclidean(_u, _v, par))
+    if _v is None:
+        return np.array(tsd.catch_euclidean(_u, None, par))
     return np.array(tsd.catch_euclidean(_u, _v, par))
 
 
 @typechecked
 def erp_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     gap_penalty: Optional[float] = 0.0,
     par: Optional[bool] = True,
@@ -196,8 +193,8 @@ def erp_distance(
 
 @typechecked
 def lcss_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     epsilon: Optional[float] = 1.0,
     par: Optional[bool] = True,
@@ -256,8 +253,8 @@ def lcss_distance(
 
 @typechecked
 def dtw_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     par: Optional[bool] = True,
     device: Optional[str] = "cpu",
@@ -314,8 +311,8 @@ def dtw_distance(
 
 @typechecked
 def ddtw_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     par: Optional[bool] = True,
     device: Optional[str] = "cpu",
@@ -372,8 +369,8 @@ def ddtw_distance(
 
 @typechecked
 def wdtw_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     g: Optional[float] = 0.05,
     par: Optional[bool] = True,
@@ -431,8 +428,8 @@ def wdtw_distance(
 
 @typechecked
 def wddtw_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     g: Optional[float] = 0.05,
     par: Optional[bool] = True,
@@ -489,8 +486,8 @@ def wddtw_distance(
 
 @typechecked
 def adtw_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     warp_penalty: Optional[float] = 1.0,
     par: Optional[bool] = True,
@@ -550,8 +547,8 @@ def adtw_distance(
 
 @typechecked
 def msm_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     par: Optional[bool] = True,
     device: Optional[str] = "cpu",
@@ -608,8 +605,8 @@ def msm_distance(
 
 @typechecked
 def twe_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
     stifness: Optional[float] = 0.001,
     penalty: Optional[float] = 1.0,
@@ -672,8 +669,8 @@ def twe_distance(
 
 @typechecked
 def sb_distance(
-    u: np.ndarray,
-    v: Optional[np.ndarray] = None,
+    u: ArrayLike,
+    v: Optional[ArrayLike] = None,
     par: Optional[bool] = True,
 ) -> Union[np.ndarray, float]:
     """
@@ -725,9 +722,9 @@ def sb_distance(
 
 
 def mp_distance(
-    u: np.ndarray,
+    u: ArrayLike,
     window: Optional[int] = 20,
-    v: Optional[np.ndarray] = None,
+    v: Optional[ArrayLike] = None,
     par: Optional[bool] = True,
 ):
     """
@@ -784,17 +781,17 @@ def mp_distance(
 
 
 __all__ = [
-    "euclidean",
-    "catch_euclidean",
-    "erp",
-    "lcss",
-    "dtw",
-    "ddtw",
-    "wdtw",
-    "wddtw",
-    "adtw",
-    "msm",
-    "twe",
-    "sb",
-    "mp",
+    "euclidean_distance",
+    "catcheucl_distance",
+    "erp_distance",
+    "lcss_distance",
+    "dtw_distance",
+    "ddtw_distance",
+    "wdtw_distance",
+    "wddtw_distance",
+    "adtw_distance",
+    "msm_distance",
+    "twe_distance",
+    "sb_distance",
+    "mp_distance",
 ]

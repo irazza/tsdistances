@@ -44,64 +44,65 @@ fn compute_distance(
     x2: Option<Vec<Vec<f64>>>,
     par: bool,
 ) -> Vec<Vec<f64>> {
-    let x1 = x1.into_iter().enumerate().collect::<Vec<_>>();
-    let distance_matrix = if par {
-        x1.par_iter()
-            .map(|(i, a)| {
-                if let Some(x2) = &x2 {
-                    x2.iter()
-                        .map(|b| {
-                            let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
-                            distance(a, b)
-                        })
-                        .collect::<Vec<_>>()
-                } else {
-                    x1.iter()
-                        .take(*i)
-                        .map(|(_, b)| {
-                            let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
-                            distance(a, b)
-                        })
-                        .collect::<Vec<_>>()
+    let n1 = x1.len();
+    if let Some(x2) = x2 {
+        let n2 = x2.len();
+        if par {
+            (0..n1)
+                .into_par_iter()
+                .map(|i| {
+                    let a = &x1[i];
+                    let mut row = vec![0.0; n2];
+                    for (j, b) in x2.iter().enumerate() {
+                        let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
+                        row[j] = distance(a, b);
+                    }
+                    row
+                })
+                .collect::<Vec<_>>()
+        } else {
+            let mut distance_matrix = vec![vec![0.0; n2]; n1];
+            for i in 0..n1 {
+                let a = &x1[i];
+                for (j, b) in x2.iter().enumerate() {
+                    let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
+                    distance_matrix[i][j] = distance(a, b);
                 }
-            })
-            .collect::<Vec<_>>()
-    } else {
-        x1.iter()
-            .map(|(i, a)| {
-                if let Some(x2) = &x2 {
-                    x2.iter()
-                        .map(|b| {
-                            let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
-                            distance(a, b)
-                        })
-                        .collect::<Vec<_>>()
-                } else {
-                    x1.iter()
-                        .take(*i)
-                        .map(|(_, b)| {
-                            let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
-                            distance(a, b)
-                        })
-                        .collect::<Vec<_>>()
+            }
+            distance_matrix
+        }
+    } else if par {
+        let mut distance_matrix = (0..n1)
+            .into_par_iter()
+            .map(|i| {
+                let a = &x1[i];
+                let mut row = vec![0.0; n1];
+                for j in i..n1 {
+                    let b = &x1[j];
+                    let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
+                    row[j] = distance(a, b);
                 }
+                row
             })
-            .collect::<Vec<_>>()
-    };
-
-    if x2.is_none() {
-        let mut distance_matrix = distance_matrix;
-        for i in 0..distance_matrix.len() {
-            let row_len = distance_matrix.len();
-            distance_matrix[i].reserve(row_len - i);
-            distance_matrix[i].push(0.0);
-            for j in i + 1..distance_matrix.len() {
-                let d = distance_matrix[j][i];
-                distance_matrix[i].push(d);
+            .collect::<Vec<_>>();
+        for i in 0..n1 {
+            for j in 0..i {
+                distance_matrix[i][j] = distance_matrix[j][i];
             }
         }
         distance_matrix
     } else {
+        let mut distance_matrix = vec![vec![0.0; n1]; n1];
+        for i in 0..n1 {
+            let a = &x1[i];
+            for j in i..n1 {
+                let b = &x1[j];
+                let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
+                let d = distance(a, b);
+                distance_matrix[i][j] = d;
+                distance_matrix[j][i] = d;
+            }
+        }
         distance_matrix
     }
 }
@@ -522,10 +523,14 @@ pub fn wdtw(
     if let Some(device) = device {
         match device {
             "cpu" => {
+                let mut max_len = x1.iter().map(|v| v.len()).max().unwrap_or(0);
+                if let Some(x2) = &x2 {
+                    let x2_max = x2.iter().map(|v| v.len()).max().unwrap_or(0);
+                    max_len = max(max_len, x2_max);
+                }
+                let weights = dtw_weights(max_len, g);
                 distance_matrix = Some(compute_distance(
                     |a, b| {
-                        let weights = dtw_weights(a.len().max(b.len()), g);
-
                         let wdtw_cost_func =
                             |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
                                 let dist = (a[i] - b[j]).powi(2)
@@ -549,10 +554,17 @@ pub fn wdtw(
                 ));
             }
             "gpu" => {
+                let mut max_len = x1.iter().map(|v| v.len()).max().unwrap_or(0);
+                if let Some(x2) = &x2 {
+                    let x2_max = x2.iter().map(|v| v.len()).max().unwrap_or(0);
+                    max_len = max(max_len, x2_max);
+                }
+                let weights = dtw_weights(max_len, g)
+                    .iter()
+                    .map(|x| *x as f32)
+                    .collect::<Vec<_>>();
                 distance_matrix = Some(compute_distance_gpu(
                     |a, b| {
-                        let weights =
-                            dtw_weights(max(a.first().unwrap().len(), b.first().unwrap().len()), g);
                         let (gpu_device, queue, sba, sda, ma) = get_device();
                         tsdistances_gpu::cpu::wdtw(
                             gpu_device.clone(),
@@ -562,7 +574,7 @@ pub fn wdtw(
                             ma.clone(),
                             a,
                             b,
-                            &weights.iter().map(|x| *x as f32).collect::<Vec<_>>(),
+                            &weights,
                         )
                     },
                     x1,

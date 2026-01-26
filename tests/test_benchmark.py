@@ -34,7 +34,6 @@ def load_benchmark():
 
 DATASETS_PATH = load_benchmark()
 
-
 def test_tsdistances():
     tsdistances_times = np.full((len(DATASETS_PATH), len(TSDISTANCES), len(MODALITIES), NUM_RUNS), np.nan)
     aeon_times = np.full((len(DATASETS_PATH), len(TSDISTANCES), NUM_RUNS), np.nan)

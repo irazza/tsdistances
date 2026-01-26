@@ -17,11 +17,19 @@ dependencies = [
 ]
 dynamic = ["authors", "description", "version"]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "aeon",
+    "stumpy",
+    "pandas",
+]
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
 python-source = "python"
 strip = true
 
 [project.urls]
-Homepage = "https://github.com/albertoazzari/tsdistances"
-Issues = "https://github.com/albertoazzari/tsdistances/issues"
+Homepage = "https://github.com/irazza/tsdistances"
+Issues = "https://github.com/irazza/tsdistances/issues"

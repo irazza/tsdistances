@@ -72,6 +72,20 @@ DEVICE_VALIDATED_DISTANCES = [
     twe_distance,
 ]
 
+PAIRWISE_DISTANCES = [
+    erp_distance,
+    lcss_distance,
+    dtw_distance,
+    ddtw_distance,
+    wdtw_distance,
+    wddtw_distance,
+    adtw_distance,
+    msm_distance,
+    twe_distance,
+    sb_distance,
+    mp_distance,
+]
+
 
 @pytest.mark.parametrize("dist", DISTANCES_CHECK_INPUT)
 def test_1d_requires_v(dist):
@@ -160,3 +174,48 @@ def test_shape_handling_mixed_dims(dist):
 
     d3 = dist(u_2d, v=None)
     assert d3.shape == (u_2d.shape[0], u_2d.shape[0])
+
+
+@pytest.mark.parametrize(
+    "dist, kwargs",
+    [
+        (dtw_distance, {"band": 0.0}),
+        (dtw_distance, {"band": 1.0}),
+        (lcss_distance, {"band": 0.0, "epsilon": 0.0}),
+        (erp_distance, {"band": 1.0, "gap_penalty": 0.0}),
+        (wdtw_distance, {"band": 1.0, "g": 0.0}),
+        (wddtw_distance, {"band": 0.5, "g": 0.1}),
+        (adtw_distance, {"band": 1.0, "warp_penalty": 0.0}),
+        (twe_distance, {"band": 1.0, "stifness": 0.0, "penalty": 0.0}),
+    ],
+)
+def test_parameter_edge_values(dist, kwargs):
+    u = np.array([1.0, 2.0, 3.0, 4.0])
+    v = np.array([2.0, 3.0, 4.0, 5.0])
+    out = dist(u, v, **kwargs)
+    assert np.isfinite(out)
+
+
+@pytest.mark.parametrize("dist", PAIRWISE_DISTANCES)
+def test_non_contiguous_inputs(dist):
+    base = np.arange(30.0).reshape(5, 6)
+    u = base[:, ::2]  # non-contiguous view
+    v = base[:, 1::2]
+    u_c = np.ascontiguousarray(u)
+    v_c = np.ascontiguousarray(v)
+    if dist is mp_distance:
+        d_nc = dist(u, v=v)
+        d_c = dist(u_c, v=v_c)
+    else:
+        d_nc = dist(u, v)
+        d_c = dist(u_c, v_c)
+    assert np.allclose(d_nc, d_c, atol=1e-8)
+
+
+def test_mp_window_extremes():
+    u = np.array([[1.0, 2.0, 3.0, 4.0]])
+    v = np.array([[4.0, 3.0, 2.0, 1.0]])
+    d_min = mp_distance(u, window=1, v=v)
+    d_max = mp_distance(u, window=u.shape[1], v=v)
+    assert not np.isnan(d_min).any()
+    assert np.isfinite(d_max).all()

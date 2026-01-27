@@ -15,35 +15,34 @@ from aeon.distances import (
 )
 import time
 import pandas as pd
-import pathlib
-
-UCR_ARCHIVE_PATH = pathlib.Path('../../DATA/ucr')
-BENCHMARKS_DS = ["ACSF1", "Adiac", "Beef", "CBF", "ChlorineConcentration", "CinCECGTorso", "CricketX", "DiatomSizeReduction", "DistalPhalanxOutlineCorrect", "ECG200", "EthanolLevel", "FreezerRegularTrain", "FreezerSmallTrain", "Ham", "Haptics", "HouseTwenty", "ItalyPowerDemand", "MixedShapesSmallTrain", "NonInvasiveFetalECGThorax1", "ShapesAll", "Strawberry", "UWaveGestureLibraryX", "Wafer"]
 TSDISTANCES = [erp_distance, dtw_distance, adtw_distance]
 AEONDISTANCES = [erp_pairwise_distance, dtw_pairwise_distance, adtw_pairwise_distance]
 MODALITIES = ["", "par", "gpu"]
 NUM_RUNS = 1  # Number of times to run each benchmark
 
-def load_benchmark_filtered():
-    benchmark_ds = sorted([x for x in UCR_ARCHIVE_PATH.iterdir() if x.name in BENCHMARKS_DS])
-    return benchmark_ds
 
-def load_benchmark():
-    benchmark_ds = sorted([x for x in UCR_ARCHIVE_PATH.iterdir() if x.is_dir()])
-    return benchmark_ds
+def generate_benchmark(seed=0):
+    rng = np.random.default_rng(seed)
+    datasets = []
+    for name, n_train, n_test, length in [
+        ("SYN_SMALL", 16, 16, 64),
+        ("SYN_MEDIUM", 32, 32, 128),
+        ("SYN_LONG", 16, 16, 256),
+    ]:
+        X_train = rng.normal(size=(n_train, length))
+        X_test = rng.normal(size=(n_test, length))
+        datasets.append((name, X_train, X_test))
+    return datasets
 
-DATASETS_PATH = load_benchmark()
+
+DATASETS = generate_benchmark()
 
 def test_tsdistances():
-    tsdistances_times = np.full((len(DATASETS_PATH), len(TSDISTANCES), len(MODALITIES), NUM_RUNS), np.nan)
-    aeon_times = np.full((len(DATASETS_PATH), len(TSDISTANCES), NUM_RUNS), np.nan)
+    tsdistances_times = np.full((len(DATASETS), len(TSDISTANCES), len(MODALITIES), NUM_RUNS), np.nan)
+    aeon_times = np.full((len(DATASETS), len(TSDISTANCES), NUM_RUNS), np.nan)
 
-    for i, dataset in enumerate(DATASETS_PATH):
-        print(f"\nDataset: {dataset.name}")
-        train = np.loadtxt(dataset / f"{dataset.name}_TRAIN.tsv", delimiter="\t")
-        test = np.loadtxt(dataset / f"{dataset.name}_TEST.tsv", delimiter="\t")
-        X_train = train[:, 1:]
-        X_test = test[:, 1:]
+    for i, (name, X_train, X_test) in enumerate(DATASETS):
+        print(f"\nDataset: {name}")
 
         for j, (tsdist, aeondist) in enumerate(zip(TSDISTANCES, AEONDISTANCES)):
             # Create small subset for warmup

@@ -1,4 +1,4 @@
-function D = tsd_twe(X1, X2, stiffness, penalty, parallel)
+function D = tsd_twe(X1, X2, band, stiffness, penalty, parallel)
 %TSD_TWE Compute Time Warp Edit (TWE) distance matrix
 %
 %   D = TSD_TWE(X1) computes the pairwise TWE distance matrix within X1.
@@ -6,12 +6,13 @@ function D = tsd_twe(X1, X2, stiffness, penalty, parallel)
 %   D = TSD_TWE(X1, X2) computes the TWE distance matrix between all pairs
 %   of time series in X1 and X2.
 %
-%   D = TSD_TWE(X1, X2, stiffness, penalty, parallel) specifies additional
-%   parameters.
+%   D = TSD_TWE(X1, X2, band, stiffness, penalty, parallel) specifies
+%   additional parameters.
 %
 %   Inputs:
 %       X1 - M x N matrix where each row is a time series
 %       X2 - (optional) P x N matrix, or [] for pairwise within X1
+%       band - (optional) Sakoe-Chiba band size [0-1], default: 1.0
 %       stiffness - (optional) stiffness parameter (nu), default: 1.0
 %       penalty - (optional) edit penalty (lambda), default: 1.0
 %       parallel - (optional) boolean to enable parallel computation
@@ -25,7 +26,7 @@ function D = tsd_twe(X1, X2, stiffness, penalty, parallel)
 %
 %   Example:
 %       X1 = randn(10, 100);
-%       D = tsd_twe(X1, [], 0.5, 0.5);
+%       D = tsd_twe(X1, [], 1.0, 0.5, 0.5);
 %
 %   See also: TSD_DTW, TSD_ERP, TSD_MSM
 
@@ -33,14 +34,17 @@ function D = tsd_twe(X1, X2, stiffness, penalty, parallel)
         X2 = [];
     end
     if nargin < 3
-        stiffness = 1.0;
+        band = 1.0;
     end
     if nargin < 4
-        penalty = 1.0;
+        stiffness = 1.0;
     end
     if nargin < 5
+        penalty = 1.0;
+    end
+    if nargin < 6
         parallel = true;
     end
     
-    D = tsd_mex('twe', X1, X2, parallel, stiffness, penalty);
+    D = tsd_mex('twe', X1, X2, parallel, band, stiffness, penalty);
 end

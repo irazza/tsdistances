@@ -10,7 +10,7 @@ use crate::core;
 /// Result structure for returning distance matrices to MATLAB
 #[repr(C)]
 pub struct DistanceResult {
-    /// Pointer to the distance matrix data (row-major order)
+    /// Pointer to the distance matrix data (column-major order)
     pub data: *mut f64,
     /// Number of rows in the result matrix
     pub rows: usize,
@@ -370,6 +370,7 @@ pub unsafe extern "C" fn tsd_twe(
     x2_data: *const f64,
     x2_rows: usize,
     x2_cols: usize,
+    sakoe_chiba_band: f64,
     stiffness: f64,
     penalty: f64,
     parallel: bool,
@@ -377,7 +378,7 @@ pub unsafe extern "C" fn tsd_twe(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::twe(x1, x2, 1.0, stiffness, penalty, parallel, "cpu") {
+    match core::twe(x1, x2, sakoe_chiba_band, stiffness, penalty, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }

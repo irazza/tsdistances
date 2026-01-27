@@ -55,7 +55,7 @@ extern DistanceResult tsd_msm(const double* x1_data, size_t x1_rows, size_t x1_c
                               double cost, bool parallel);
 extern DistanceResult tsd_twe(const double* x1_data, size_t x1_rows, size_t x1_cols,
                               const double* x2_data, size_t x2_rows, size_t x2_cols,
-                              double stiffness, double penalty, bool parallel);
+                              double sakoe_chiba_band, double stiffness, double penalty, bool parallel);
 extern DistanceResult tsd_sbd(const double* x1_data, size_t x1_rows, size_t x1_cols,
                               const double* x2_data, size_t x2_rows, size_t x2_cols,
                               bool parallel);
@@ -187,9 +187,10 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
         result = tsd_msm(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols, cost, parallel);
     }
     else if (strcmp(func_name, "twe") == 0) {
-        double stiffness = (nrhs > 4) ? mxGetScalar(prhs[4]) : 1.0;
-        double penalty = (nrhs > 5) ? mxGetScalar(prhs[5]) : 1.0;
-        result = tsd_twe(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols, stiffness, penalty, parallel);
+        double band = (nrhs > 4) ? mxGetScalar(prhs[4]) : 1.0;
+        double stiffness = (nrhs > 5) ? mxGetScalar(prhs[5]) : 1.0;
+        double penalty = (nrhs > 6) ? mxGetScalar(prhs[6]) : 1.0;
+        result = tsd_twe(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols, band, stiffness, penalty, parallel);
     }
     else if (strcmp(func_name, "sbd") == 0) {
         result = tsd_sbd(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols, parallel);

@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use rayon::prelude::*;
+#[cfg(feature = "gpu")]
 use tsdistances_gpu::utils::get_device;
 
 /// Error type for distance computation
@@ -31,6 +32,11 @@ impl std::error::Error for DistanceError {}
 
 pub type Result<T> = std::result::Result<T, DistanceError>;
 
+fn gpu_feature_error() -> DistanceError {
+    DistanceError::InvalidParameter("GPU support is not enabled in this build".to_string())
+}
+
+#[cfg(feature = "gpu")]
 fn compute_distance_gpu(
     distance: impl (Fn(&Vec<Vec<f32>>, &Vec<Vec<f32>>) -> Vec<Vec<f32>>) + Sync + Send,
     x1: Vec<Vec<f64>>,
@@ -293,24 +299,31 @@ pub fn erp(
             Ok(distance_matrix)
         }
         "gpu" => {
-            let distance_matrix = compute_distance_gpu(
-                |a, b| {
-                    let (gpu_device, queue, sba, sda, ma) = get_device();
-                    tsdistances_gpu::cpu::erp(
-                        gpu_device.clone(),
-                        queue.clone(),
-                        sba.clone(),
-                        sda.clone(),
-                        ma.clone(),
-                        a,
-                        b,
-                        gap_penalty as f32,
-                    )
-                },
-                x1,
-                x2,
-            );
-            Ok(distance_matrix)
+            #[cfg(feature = "gpu")]
+            {
+                let distance_matrix = compute_distance_gpu(
+                    |a, b| {
+                        let (gpu_device, queue, sba, sda, ma) = get_device();
+                        tsdistances_gpu::cpu::erp(
+                            gpu_device.clone(),
+                            queue.clone(),
+                            sba.clone(),
+                            sda.clone(),
+                            ma.clone(),
+                            a,
+                            b,
+                            gap_penalty as f32,
+                        )
+                    },
+                    x1,
+                    x2,
+                );
+                Ok(distance_matrix)
+            }
+            #[cfg(not(feature = "gpu"))]
+            {
+                Err(gpu_feature_error())
+            }
         }
         _ => Err(DistanceError::InvalidParameter(
             "Device must be either 'cpu' or 'gpu'".to_string(),
@@ -367,24 +380,31 @@ pub fn lcss(
             Ok(distance_matrix)
         }
         "gpu" => {
-            let distance_matrix = compute_distance_gpu(
-                |a, b| {
-                    let (gpu_device, queue, sba, sda, ma) = get_device();
-                    tsdistances_gpu::cpu::lcss(
-                        gpu_device.clone(),
-                        queue.clone(),
-                        sba.clone(),
-                        sda.clone(),
-                        ma.clone(),
-                        a,
-                        b,
-                        epsilon as f32,
-                    )
-                },
-                x1,
-                x2,
-            );
-            Ok(distance_matrix)
+            #[cfg(feature = "gpu")]
+            {
+                let distance_matrix = compute_distance_gpu(
+                    |a, b| {
+                        let (gpu_device, queue, sba, sda, ma) = get_device();
+                        tsdistances_gpu::cpu::lcss(
+                            gpu_device.clone(),
+                            queue.clone(),
+                            sba.clone(),
+                            sda.clone(),
+                            ma.clone(),
+                            a,
+                            b,
+                            epsilon as f32,
+                        )
+                    },
+                    x1,
+                    x2,
+                );
+                Ok(distance_matrix)
+            }
+            #[cfg(not(feature = "gpu"))]
+            {
+                Err(gpu_feature_error())
+            }
         }
         _ => Err(DistanceError::InvalidParameter(
             "Device must be either 'cpu' or 'gpu'".to_string(),
@@ -432,23 +452,30 @@ pub fn dtw(
             Ok(distance_matrix)
         }
         "gpu" => {
-            let distance_matrix = compute_distance_gpu(
-                |a, b| {
-                    let (gpu_device, queue, sba, sda, ma) = get_device();
-                    tsdistances_gpu::cpu::dtw(
-                        gpu_device.clone(),
-                        queue.clone(),
-                        sba.clone(),
-                        sda.clone(),
-                        ma.clone(),
-                        a,
-                        b,
-                    )
-                },
-                x1,
-                x2,
-            );
-            Ok(distance_matrix)
+            #[cfg(feature = "gpu")]
+            {
+                let distance_matrix = compute_distance_gpu(
+                    |a, b| {
+                        let (gpu_device, queue, sba, sda, ma) = get_device();
+                        tsdistances_gpu::cpu::dtw(
+                            gpu_device.clone(),
+                            queue.clone(),
+                            sba.clone(),
+                            sda.clone(),
+                            ma.clone(),
+                            a,
+                            b,
+                        )
+                    },
+                    x1,
+                    x2,
+                );
+                Ok(distance_matrix)
+            }
+            #[cfg(not(feature = "gpu"))]
+            {
+                Err(gpu_feature_error())
+            }
         }
         _ => Err(DistanceError::InvalidParameter(
             "Device must be either 'cpu' or 'gpu'".to_string(),
@@ -514,26 +541,33 @@ pub fn wdtw(
             Ok(distance_matrix)
         }
         "gpu" => {
-            let distance_matrix = compute_distance_gpu(
-                |a, b| {
-                    let weights =
-                        dtw_weights(max(a.first().unwrap().len(), b.first().unwrap().len()), g);
-                    let (gpu_device, queue, sba, sda, ma) = get_device();
-                    tsdistances_gpu::cpu::wdtw(
-                        gpu_device.clone(),
-                        queue.clone(),
-                        sba.clone(),
-                        sda.clone(),
-                        ma.clone(),
-                        a,
-                        b,
-                        &weights.iter().map(|x| *x as f32).collect::<Vec<_>>(),
-                    )
-                },
-                x1,
-                x2,
-            );
-            Ok(distance_matrix)
+            #[cfg(feature = "gpu")]
+            {
+                let distance_matrix = compute_distance_gpu(
+                    |a, b| {
+                        let weights =
+                            dtw_weights(max(a.first().unwrap().len(), b.first().unwrap().len()), g);
+                        let (gpu_device, queue, sba, sda, ma) = get_device();
+                        tsdistances_gpu::cpu::wdtw(
+                            gpu_device.clone(),
+                            queue.clone(),
+                            sba.clone(),
+                            sda.clone(),
+                            ma.clone(),
+                            a,
+                            b,
+                            &weights.iter().map(|x| *x as f32).collect::<Vec<_>>(),
+                        )
+                    },
+                    x1,
+                    x2,
+                );
+                Ok(distance_matrix)
+            }
+            #[cfg(not(feature = "gpu"))]
+            {
+                Err(gpu_feature_error())
+            }
         }
         _ => Err(DistanceError::InvalidParameter(
             "Device must be either 'cpu' or 'gpu'".to_string(),
@@ -602,24 +636,31 @@ pub fn adtw(
             Ok(distance_matrix)
         }
         "gpu" => {
-            let distance_matrix = compute_distance_gpu(
-                |a, b| {
-                    let (gpu_device, queue, sba, sda, ma) = get_device();
-                    tsdistances_gpu::cpu::adtw(
-                        gpu_device.clone(),
-                        queue.clone(),
-                        sba.clone(),
-                        sda.clone(),
-                        ma.clone(),
-                        a,
-                        b,
-                        warp_penalty as f32,
-                    )
-                },
-                x1,
-                x2,
-            );
-            Ok(distance_matrix)
+            #[cfg(feature = "gpu")]
+            {
+                let distance_matrix = compute_distance_gpu(
+                    |a, b| {
+                        let (gpu_device, queue, sba, sda, ma) = get_device();
+                        tsdistances_gpu::cpu::adtw(
+                            gpu_device.clone(),
+                            queue.clone(),
+                            sba.clone(),
+                            sda.clone(),
+                            ma.clone(),
+                            a,
+                            b,
+                            warp_penalty as f32,
+                        )
+                    },
+                    x1,
+                    x2,
+                );
+                Ok(distance_matrix)
+            }
+            #[cfg(not(feature = "gpu"))]
+            {
+                Err(gpu_feature_error())
+            }
         }
         _ => Err(DistanceError::InvalidParameter(
             "Device must be either 'cpu' or 'gpu'".to_string(),
@@ -690,23 +731,30 @@ pub fn msm(
             Ok(distance_matrix)
         }
         "gpu" => {
-            let distance_matrix = compute_distance_gpu(
-                |a, b| {
-                    let (gpu_device, queue, sba, sda, ma) = get_device();
-                    tsdistances_gpu::cpu::msm(
-                        gpu_device.clone(),
-                        queue.clone(),
-                        sba.clone(),
-                        sda.clone(),
-                        ma.clone(),
-                        a,
-                        b,
-                    )
-                },
-                x1,
-                x2,
-            );
-            Ok(distance_matrix)
+            #[cfg(feature = "gpu")]
+            {
+                let distance_matrix = compute_distance_gpu(
+                    |a, b| {
+                        let (gpu_device, queue, sba, sda, ma) = get_device();
+                        tsdistances_gpu::cpu::msm(
+                            gpu_device.clone(),
+                            queue.clone(),
+                            sba.clone(),
+                            sda.clone(),
+                            ma.clone(),
+                            a,
+                            b,
+                        )
+                    },
+                    x1,
+                    x2,
+                );
+                Ok(distance_matrix)
+            }
+            #[cfg(not(feature = "gpu"))]
+            {
+                Err(gpu_feature_error())
+            }
         }
         _ => Err(DistanceError::InvalidParameter(
             "Device must be either 'cpu' or 'gpu'".to_string(),
@@ -786,25 +834,32 @@ pub fn twe(
             Ok(distance_matrix)
         }
         "gpu" => {
-            let distance_matrix = compute_distance_gpu(
-                |a, b| {
-                    let (gpu_device, queue, sba, sda, ma) = get_device();
-                    tsdistances_gpu::cpu::twe(
-                        gpu_device.clone(),
-                        queue.clone(),
-                        sba.clone(),
-                        sda.clone(),
-                        ma.clone(),
-                        a,
-                        b,
-                        stiffness as f32,
-                        penalty as f32,
-                    )
-                },
-                x1,
-                x2,
-            );
-            Ok(distance_matrix)
+            #[cfg(feature = "gpu")]
+            {
+                let distance_matrix = compute_distance_gpu(
+                    |a, b| {
+                        let (gpu_device, queue, sba, sda, ma) = get_device();
+                        tsdistances_gpu::cpu::twe(
+                            gpu_device.clone(),
+                            queue.clone(),
+                            sba.clone(),
+                            sda.clone(),
+                            ma.clone(),
+                            a,
+                            b,
+                            stiffness as f32,
+                            penalty as f32,
+                        )
+                    },
+                    x1,
+                    x2,
+                );
+                Ok(distance_matrix)
+            }
+            #[cfg(not(feature = "gpu"))]
+            {
+                Err(gpu_feature_error())
+            }
         }
         _ => Err(DistanceError::InvalidParameter(
             "Device must be either 'cpu' or 'gpu'".to_string(),

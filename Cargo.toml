@@ -19,7 +19,7 @@ rayon = "1.10.0"
 rustfft = "6.3.0"
 #tsdistances_gpu = { version = "0.1.0", path = "../tsdistances_gpu", default-features = false }
 vulkano = "0.35.1"
-tsdistances_gpu = { git = "https://github.com/albertoazzari/tsdistances_gpu.git", default-features = false }
+tsdistances_gpu = { git = "https://github.com/albertoazzari/tsdistances_gpu.git", default-features = false, optional = true }
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
@@ -32,12 +32,15 @@ codegen-units = 16
 strip = true
 
 [features]
-default = ["python", "use-compiled-tools"]
+default = ["python", "gpu", "use-compiled-tools"]
+gpu = ["dep:tsdistances_gpu"]
 python = ["pyo3", "ctrlc"]
 use-compiled-tools = [
+    "gpu",
     "tsdistances_gpu/use-compiled-tools",
 ]
 use-installed-tools = [
+    "gpu",
     "tsdistances_gpu/use-installed-tools",
 ]
 matlab = []

@@ -30,8 +30,8 @@ function build_tsdistances()
     fprintf('\n[1/4] Building Rust library...\n');
     old_dir = cd(project_root);
     try
-        % Build with matlab feature and without default features (no PyO3)
-        build_cmd = 'cargo build --release --no-default-features --features matlab,use-compiled-tools 2>&1';
+        % Build the CPU-only MATLAB library without Python or GPU dependencies.
+        build_cmd = 'cargo build --release --no-default-features --features matlab 2>&1';
         [status, result] = system(build_cmd);
         if status ~= 0
             error('Failed to build Rust library:\n%s', result);

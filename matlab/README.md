@@ -200,7 +200,7 @@ D = tsd_dtw(X, [], 0.1);
 - **Windows**: Install Visual Studio Build Tools
 
 ### Build fails with Vulkan errors
-- GPU support is optional; build will complete without Vulkan
+- The default MATLAB build is CPU-only and should complete without Vulkan
 - To enable GPU: Download Vulkan SDK from https://vulkan.lunarg.com/sdk/home
 
 ### MEX compilation error on macOS
@@ -266,5 +266,4 @@ And the original papers for each distance measure (see table above).
 - **Issues**: https://github.com/albertoazzari/tsdistances/issues
 - **Documentation**: See [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)
 - Include MATLAB version (`version` in MATLAB), OS, and full error messages
-
 

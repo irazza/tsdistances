@@ -167,6 +167,7 @@ DistanceResult tsd_msm(
 DistanceResult tsd_twe(
     const double* x1_data, size_t x1_rows, size_t x1_cols,
     const double* x2_data, size_t x2_rows, size_t x2_cols,
+    double sakoe_chiba_band,
     double stiffness, double penalty, bool parallel
 );
 

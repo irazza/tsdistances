@@ -115,6 +115,7 @@ The library uses Cargo feature flags to control what gets compiled:
 | Feature | Description | Default |
 |---------|-------------|---------|
 | `python` | Python bindings via PyO3 | ✓ |
+| `gpu` | Enable Vulkan/Rust-GPU support | ✓ |
 | `matlab` | MATLAB/C FFI bindings | ✗ |
 | `use-compiled-tools` | Use pre-compiled SPIRV tools for GPU | ✓ |
 | `use-installed-tools` | Use system-installed SPIRV tools | ✗ |
@@ -128,7 +129,7 @@ cargo build --release --features python,use-compiled-tools
 
 For MATLAB bindings only (no Python dependency):
 ```bash
-cargo build --release --no-default-features --features matlab,use-compiled-tools
+cargo build --release --no-default-features --features matlab
 ```
 
 See [matlab/README.md](matlab/README.md) for detailed MATLAB installation instructions. 
@@ -203,4 +204,3 @@ To run the correctness tests, simply use `pytest`:
 ```bash
 pytest -v tests/test_correctness_cpu.py
 ```
-

@@ -1,4 +1,5 @@
-use rustfft::{Fft, FftDirection, algorithm::Radix4, num_complex::Complex};
+use rustfft::{Fft, FftPlanner, num_complex::Complex};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 pub fn min<T: PartialOrd>(x: T, y: T) -> T {
     if x < y { x } else { y }
@@ -44,32 +45,79 @@ pub fn msm_cost_function(x: f64, y: f64, z: f64) -> f64 {
 pub fn cross_correlation(a: &[f64], b: &[f64]) -> Vec<f64> {
     // zero-pad the input signals a and b (add zeros to the end of each. The zero padding should fill the vectors until they reach a size of at least N = size(a)+size(b)-1
     let fft_len = (a.len() + b.len() - 1).next_power_of_two();
-    let fft = Radix4::new(fft_len, FftDirection::Forward);
 
-    let mut a_fft = vec![Complex::new(0.0, 0.0); fft_len];
-    let mut b_fft = vec![Complex::new(0.0, 0.0); fft_len];
-    for (i, val) in a.iter().enumerate() {
-        a_fft[i] = Complex::new(*val, 0.0);
-    }
-    for (i, val) in b.iter().enumerate() {
-        b_fft[i] = Complex::new(*val, 0.0);
+    FFT_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        let (fft, ifft) = cache.get_plans(fft_len);
+        cache.ensure_len(fft_len);
+
+        cache.a_fft.fill(Complex::new(0.0, 0.0));
+        cache.b_fft.fill(Complex::new(0.0, 0.0));
+        for (i, val) in a.iter().enumerate() {
+            cache.a_fft[i].re = *val;
+        }
+        for (i, val) in b.iter().enumerate() {
+            cache.b_fft[i].re = *val;
+        }
+
+        fft.process(&mut cache.a_fft);
+        fft.process(&mut cache.b_fft);
+
+        for i in 0..fft_len {
+            cache.c_fft[i] = cache.a_fft[i].conj() * cache.b_fft[i];
+        }
+
+        ifft.process(&mut cache.c_fft);
+        for i in 0..fft_len {
+            cache.c[i] = cache.c_fft[i].re / fft_len as f64;
+        }
+        cache.c.clone()
+    })
+}
+
+struct FftCache {
+    planner: FftPlanner<f64>,
+    plans: HashMap<usize, (Arc<dyn Fft<f64>>, Arc<dyn Fft<f64>>)>,
+    a_fft: Vec<Complex<f64>>,
+    b_fft: Vec<Complex<f64>>,
+    c_fft: Vec<Complex<f64>>,
+    c: Vec<f64>,
+}
+
+impl FftCache {
+    fn new() -> Self {
+        Self {
+            planner: FftPlanner::new(),
+            plans: HashMap::new(),
+            a_fft: Vec::new(),
+            b_fft: Vec::new(),
+            c_fft: Vec::new(),
+            c: Vec::new(),
+        }
     }
 
-    fft.process(&mut a_fft);
-    fft.process(&mut b_fft);
-
-    let mut c_fft = vec![Complex::new(0.0, 0.0); fft_len];
-    for i in 0..fft_len {
-        c_fft[i] = a_fft[i].conj() * b_fft[i];
+    fn get_plans(&mut self, len: usize) -> (Arc<dyn Fft<f64>>, Arc<dyn Fft<f64>>) {
+        if let Some((fft, ifft)) = self.plans.get(&len) {
+            return (fft.clone(), ifft.clone());
+        }
+        let fft = self.planner.plan_fft_forward(len);
+        let ifft = self.planner.plan_fft_inverse(len);
+        self.plans.insert(len, (fft.clone(), ifft.clone()));
+        (fft, ifft)
     }
 
-    let mut c = vec![0.0; fft_len];
-    let ifft = Radix4::new(fft_len, FftDirection::Inverse);
-    ifft.process(&mut c_fft);
-    for i in 0..fft_len {
-        c[i] = c_fft[i].re / fft_len as f64;
+    fn ensure_len(&mut self, len: usize) {
+        if self.a_fft.len() != len {
+            self.a_fft.resize(len, Complex::new(0.0, 0.0));
+            self.b_fft.resize(len, Complex::new(0.0, 0.0));
+            self.c_fft.resize(len, Complex::new(0.0, 0.0));
+            self.c.resize(len, 0.0);
+        }
     }
-    c
+}
+
+thread_local! {
+    static FFT_CACHE: RefCell<FftCache> = RefCell::new(FftCache::new());
 }
 
 pub fn zscore(x: &[f64]) -> Vec<f64> {

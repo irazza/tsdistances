@@ -1839,7 +1839,7 @@ dependencies = [
 
 [[package]]
 name = "tsdistances"
-version = "0.1.8"
+version = "0.1.9-dev"
 dependencies = [
  "catch22",
  "ctrlc",

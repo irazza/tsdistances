@@ -7,6 +7,7 @@ function build_tsdistances()
 %   Requirements:
 %       - Rust toolchain (cargo, rustc)
 %       - MATLAB with MEX compiler configured
+%         (Windows requires Microsoft Visual C++)
 %       - System dependencies (handled by script)
 %
 %   This function will:
@@ -80,6 +81,15 @@ function build_tsdistances()
     
     mex_src = fullfile(script_dir, 'tsd_mex.c');
     header_dir = script_dir;  % Header file is in matlab directory
+    windows_native_link_args = '';
+
+    if ispc && use_static
+        native_libs = get_windows_rust_native_link_libs(project_root);
+        windows_native_link_args = format_windows_link_args(native_libs);
+        if ~isempty(native_libs)
+            fprintf('Linking Rust native system libraries: %s\n', strjoin(native_libs, ', '));
+        end
+    end
     
     % Build MEX command with static library
     if use_static
@@ -91,8 +101,8 @@ function build_tsdistances()
             mex_cmd = sprintf('mex -R2018a "%s" "%s" -I"%s" -outdir "%s"', ...
                               mex_src, lib_file, header_dir, script_dir);
         else % Windows
-            mex_cmd = sprintf('mex "%s" "%s" -I"%s" -outdir "%s"', ...
-                              mex_src, lib_file, header_dir, script_dir);
+            mex_cmd = sprintf('mex "%s" "%s"%s -I"%s" -outdir "%s"', ...
+                              mex_src, lib_file, windows_native_link_args, header_dir, script_dir);
         end
     else
         % Dynamic library
@@ -158,6 +168,154 @@ function check_and_install_dependencies(project_root)
     end
 end
 
+function selected_cfg = check_matlab_mex()
+    fprintf('\n--- Checking MATLAB MEX ---\n');
+
+    mex_path = which('mex');
+    if isempty(mex_path)
+        fprintf('ERROR: MATLAB MEX function is not available in this session.\n');
+        fprintf('Make sure you are running this script inside MATLAB.\n');
+        error('build_tsdistances:MexUnavailable', ...
+              'MATLAB mex is unavailable in this session. Run build_tsdistances from inside MATLAB.');
+    end
+
+    try
+        selected_cfg = mex.getCompilerConfigurations('C', 'Selected');
+    catch ME
+        fprintf('ERROR: Unable to query MATLAB MEX compiler configuration.\n');
+        fprintf('Run from MATLAB: mex -setup C\n');
+        fprintf('Underlying error: %s\n', ME.message);
+        error('build_tsdistances:MexConfigQueryFailed', ...
+              'Unable to query the MATLAB C MEX compiler configuration. Run "mex -setup C".');
+    end
+
+    if isempty(selected_cfg)
+        fprintf('ERROR: No MATLAB C MEX compiler is configured.\n');
+        fprintf('Solution:\n');
+        fprintf('  1. Run from MATLAB: mex -setup C\n');
+        fprintf('  2. Select a supported C compiler\n');
+        if ispc
+            fprintf('  3. On Windows, install Visual Studio Build Tools if needed\n');
+            fprintf('  4. Choose Microsoft Visual C++ when MATLAB prompts you\n');
+        end
+
+        try
+            installed_cfg = mex.getCompilerConfigurations('C', 'Installed');
+            if isempty(installed_cfg)
+                fprintf('MATLAB did not detect any supported installed C compiler.\n');
+            else
+                fprintf('MATLAB detected these installed C compilers:\n');
+                for i = 1:length(installed_cfg)
+                    fprintf('  - %s\n', installed_cfg(i).Name);
+                end
+            end
+        catch
+            % Ignore secondary detection errors and keep the main guidance concise.
+        end
+
+        error('build_tsdistances:MexCompilerNotConfigured', ...
+              'No MATLAB C MEX compiler is configured. Run "mex -setup C" and select a supported compiler.');
+    end
+
+    fprintf('✓ MEX compiler is available: %s\n', selected_cfg.Name);
+end
+
+function native_libs = get_windows_rust_native_link_libs(project_root)
+    native_libs = {};
+    if ~ispc
+        return;
+    end
+
+    old_dir = cd(project_root);
+    try
+        query_cmd = 'cargo rustc --release --lib --no-default-features --features matlab -- --print native-static-libs 2>&1';
+        [status, output] = system(query_cmd);
+    catch ME
+        cd(old_dir);
+        rethrow(ME);
+    end
+    cd(old_dir);
+
+    if status ~= 0
+        fprintf('WARNING: Unable to query Rust native link libraries.\n');
+        fprintf('Continuing without extra Windows system libraries.\n');
+        return;
+    end
+
+    output_lines = regexp(output, '\r\n|\n|\r', 'split');
+    native_line = '';
+    for i = 1:numel(output_lines)
+        line = strtrim(output_lines{i});
+        if contains(line, 'native-static-libs:')
+            native_line = line;
+            break;
+        end
+    end
+
+    if isempty(native_line)
+        return;
+    end
+
+    match = regexp(native_line, 'native-static-libs:\s*(.*)$', 'tokens', 'once');
+    if isempty(match)
+        return;
+    end
+
+    tokens = regexp(strtrim(match{1}), '\s+', 'split');
+    for i = 1:numel(tokens)
+        lib_name = strtrim(tokens{i});
+        if isempty(lib_name)
+            continue;
+        end
+
+        lib_name = regexprep(lib_name, '^[,;]+|[,;]+$', '');
+
+        if strncmp(lib_name, '/defaultlib:', 12)
+            lib_name = lib_name(13:end);
+        elseif strncmp(lib_name, '-l', 2)
+            lib_name = lib_name(3:end);
+        end
+
+        if length(lib_name) > 4 && strcmpi(lib_name(end-3:end), '.lib')
+            lib_name = lib_name(1:end-4);
+        end
+
+        if isempty(lib_name) || ...
+           isempty(regexp(lib_name, '^[A-Za-z0-9_.-]+$', 'once')) || ...
+           any(strcmpi(native_libs, lib_name))
+            continue;
+        end
+
+        native_libs{end+1} = lib_name; %#ok<AGROW>
+    end
+end
+
+function link_args = format_windows_link_args(native_libs)
+    link_args = '';
+
+    for i = 1:numel(native_libs)
+        link_args = sprintf('%s -l%s', link_args, native_libs{i});
+    end
+end
+
+function check_windows_mex_compiler(selected_cfg)
+    compiler_name = char(selected_cfg(1).Name);
+    compiler_name_lower = lower(compiler_name);
+
+    if contains(compiler_name_lower, 'microsoft') || ...
+       contains(compiler_name_lower, 'visual') || ...
+       contains(compiler_name_lower, 'msvc')
+        return;
+    end
+
+    fprintf('ERROR: MATLAB is configured to use "%s".\n', compiler_name);
+    fprintf('Windows builds require Microsoft Visual C++ for MATLAB MEX and Rust to link cleanly.\n');
+    fprintf('Run from MATLAB: mex -setup C\n');
+    fprintf('Then select a Microsoft Visual C++ compiler.\n');
+    error('build_tsdistances:WindowsCompilerMismatch', ...
+          'Windows builds require MATLAB to use Microsoft Visual C++. Run "mex -setup C" and select a Microsoft compiler.');
+end
+
 % =========================================================================
 % macOS dependency checker
 % =========================================================================
@@ -179,18 +337,7 @@ function check_dependencies_macos(project_root)
     end
     
     % Check MATLAB mex
-    fprintf('\n--- Checking MATLAB MEX ---\n');
-    [status, ~] = system('mex -v 2>&1 | head -1');
-    if status ~= 0
-        fprintf('ERROR: MATLAB MEX not found!\n');
-        fprintf('Solution:\n');
-        fprintf('  1. Make sure MATLAB is installed\n');
-        fprintf('  2. Run from MATLAB: mex -setup C\n');
-        fprintf('  3. Follow the prompts to configure a C compiler\n');
-        error('MATLAB MEX compiler is required.');
-    else
-        fprintf('✓ MEX compiler is available\n');
-    end
+    check_matlab_mex();
     
     % Check C compiler
     fprintf('\n--- Checking C compiler ---\n');
@@ -249,18 +396,7 @@ function check_dependencies_linux(project_root)
     end
     
     % Check MATLAB mex
-    fprintf('\n--- Checking MATLAB MEX ---\n');
-    [status, ~] = system('mex -v 2>&1 | head -1');
-    if status ~= 0
-        fprintf('ERROR: MATLAB MEX not found!\n');
-        fprintf('Solution:\n');
-        fprintf('  1. Make sure MATLAB is installed\n');
-        fprintf('  2. Run from MATLAB: mex -setup C\n');
-        fprintf('  3. Follow the prompts to configure a C compiler\n');
-        error('MATLAB MEX compiler is required.');
-    else
-        fprintf('✓ MEX compiler is available\n');
-    end
+    check_matlab_mex();
     
     % Check GCC
     fprintf('\n--- Checking C compiler ---\n');
@@ -338,28 +474,19 @@ function check_dependencies_windows(project_root)
     end
     
     % Check MATLAB mex
-    fprintf('\n--- Checking MATLAB MEX ---\n');
-    [status, ~] = system('mex -v 2>&1');
-    if status ~= 0
-        fprintf('ERROR: MATLAB MEX not found!\n');
-        fprintf('Solution:\n');
-        fprintf('  1. Make sure MATLAB is installed\n');
-        fprintf('  2. Run from MATLAB: mex -setup C\n');
-        fprintf('  3. Follow the prompts to configure a C compiler\n');
-        error('MATLAB MEX compiler is required.');
-    else
-        fprintf('✓ MEX compiler is available\n');
-    end
+    selected_cfg = check_matlab_mex();
+    check_windows_mex_compiler(selected_cfg);
     
     % Check for Visual Studio Build Tools or MSVC
     fprintf('\n--- Checking C compiler (MSVC) ---\n');
     [status, ~] = system('cl.exe 2>&1 | findstr /r "Microsoft"');
     if status ~= 0
-        fprintf('WARNING: Microsoft Visual C++ compiler not found!\n');
-        fprintf('Install one of the following:\n');
+        fprintf('WARNING: Microsoft Visual C++ was not found on PATH.\n');
+        fprintf('Rust built successfully, so this may be harmless in this session.\n');
+        fprintf('If linking later fails, install or repair one of the following:\n');
         fprintf('  1. Visual Studio Community Edition (https://visualstudio.microsoft.com/)\n');
         fprintf('  2. Visual Studio Build Tools (https://visualstudio.microsoft.com/downloads/)\n');
-        fprintf('  3. Or ensure MSVC is in your PATH\n');
+        fprintf('  3. Or ensure MSVC is available on PATH / in a Developer Command Prompt\n');
         fprintf('For Rust: https://doc.rust-lang.org/book/ch01-01-installation.html#installing-on-windows\n');
     else
         fprintf('✓ Microsoft Visual C++ compiler is available\n');

@@ -34,6 +34,23 @@ typedef struct {
 } DistanceResult;
 
 /**
+ * Ragged time-series input descriptor.
+ *
+ * Data is stored as a concatenation of all series values in `data`, while
+ * `lengths` stores the length of each series.
+ */
+typedef struct {
+    /** Pointer to concatenated time-series values */
+    const double* data;
+    /** Pointer to per-series lengths (size = rows) */
+    const size_t* lengths;
+    /** Number of time series */
+    size_t rows;
+    /** Total number of values in data */
+    size_t total_values;
+} RaggedInput;
+
+/**
  * Free memory allocated for a DistanceResult.
  * 
  * @param result Pointer to the result to free (can be NULL)
@@ -190,6 +207,85 @@ DistanceResult tsd_sbd(
 DistanceResult tsd_mp(
     const double* x1_data, size_t x1_rows, size_t x1_cols,
     const double* x2_data, size_t x2_rows, size_t x2_cols,
+    size_t window_size, bool parallel
+);
+
+DistanceResult tsd_euclidean_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    bool parallel
+);
+
+DistanceResult tsd_catch_euclidean_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    bool parallel
+);
+
+DistanceResult tsd_erp_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band, double gap_penalty, bool parallel
+);
+
+DistanceResult tsd_lcss_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band, double epsilon, bool parallel
+);
+
+DistanceResult tsd_dtw_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band, bool parallel
+);
+
+DistanceResult tsd_ddtw_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band, bool parallel
+);
+
+DistanceResult tsd_wdtw_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band, double g, bool parallel
+);
+
+DistanceResult tsd_wddtw_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band, double g, bool parallel
+);
+
+DistanceResult tsd_adtw_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band, double warp_penalty, bool parallel
+);
+
+DistanceResult tsd_msm_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double cost, bool parallel
+);
+
+DistanceResult tsd_twe_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    double sakoe_chiba_band,
+    double stiffness, double penalty, bool parallel
+);
+
+DistanceResult tsd_sbd_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
+    bool parallel
+);
+
+DistanceResult tsd_mp_ragged(
+    const RaggedInput* x1,
+    const RaggedInput* x2,
     size_t window_size, bool parallel
 );
 

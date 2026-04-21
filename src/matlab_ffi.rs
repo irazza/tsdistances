@@ -20,6 +20,18 @@ pub struct DistanceResult {
     pub error_code: i32,
 }
 
+/// Ragged time-series input descriptor for C FFI.
+///
+/// `data` stores all time-series values concatenated, `lengths` stores the
+/// length of each series, and `rows` is the number of series.
+#[repr(C)]
+pub struct RaggedInput {
+    pub data: *const f64,
+    pub lengths: *const usize,
+    pub rows: usize,
+    pub total_values: usize,
+}
+
 impl DistanceResult {
     fn success(data: Vec<Vec<f64>>) -> Self {
         let rows = data.len();
@@ -113,6 +125,78 @@ unsafe fn c_arrays_to_vecs(
     };
 
     (x1, x2)
+}
+
+unsafe fn ragged_input_to_vecs(input: *const RaggedInput) -> Result<Option<Vec<Vec<f64>>>, i32> {
+    if input.is_null() {
+        return Ok(None);
+    }
+
+    let input = unsafe { &*input };
+    if input.rows == 0 {
+        return Ok(None);
+    }
+
+    if input.lengths.is_null() {
+        return Err(3);
+    }
+
+    if input.total_values > 0 && input.data.is_null() {
+        return Err(3);
+    }
+
+    let lengths = unsafe { slice::from_raw_parts(input.lengths, input.rows) };
+    let expected_total = lengths.iter().try_fold(0usize, |acc, len| acc.checked_add(*len));
+    let expected_total = match expected_total {
+        Some(v) => v,
+        None => return Err(3),
+    };
+
+    if expected_total != input.total_values {
+        return Err(3);
+    }
+
+    let data = if input.total_values == 0 {
+        &[][..]
+    } else {
+        unsafe { slice::from_raw_parts(input.data, input.total_values) }
+    };
+
+    let mut result = Vec::with_capacity(input.rows);
+    let mut offset = 0usize;
+    for len in lengths {
+        let end = match offset.checked_add(*len) {
+            Some(v) => v,
+            None => return Err(3),
+        };
+        if end > data.len() {
+            return Err(3);
+        }
+        result.push(data[offset..end].to_vec());
+        offset = end;
+    }
+
+    Ok(Some(result))
+}
+
+fn validate_equal_lengths(x1: &[Vec<f64>], x2: Option<&[Vec<f64>]>) -> bool {
+    let first_len = x1.first().map(|v| v.len()).or_else(|| x2.and_then(|v| v.first().map(|s| s.len())));
+
+    let Some(first_len) = first_len else {
+        return true;
+    };
+
+    if x1.iter().any(|series| series.len() != first_len) {
+        return false;
+    }
+
+    if let Some(x2) = x2 {
+        if x2.iter().any(|series| series.len() != first_len) {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// Compute Euclidean distance matrix
@@ -432,6 +516,364 @@ pub unsafe extern "C" fn tsd_mp(
 ) -> DistanceResult {
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
+
+    match core::mp(x1, x2, window_size as i32, parallel) {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute Euclidean distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_euclidean_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    if !validate_equal_lengths(&x1, x2.as_deref()) {
+        return DistanceResult::error(2);
+    }
+
+    match core::euclidean(x1, x2, parallel) {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute Catch22-Euclidean distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_catch_euclidean_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    if !validate_equal_lengths(&x1, x2.as_deref()) {
+        return DistanceResult::error(2);
+    }
+
+    match core::catch_euclidean(x1, x2, parallel) {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute ERP distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_erp_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    gap_penalty: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::erp(x1, x2, sakoe_chiba_band, gap_penalty, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute LCSS distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_lcss_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    epsilon: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::lcss(x1, x2, sakoe_chiba_band, epsilon, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute DTW distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_dtw_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::dtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute DDTW distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_ddtw_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::ddtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute WDTW distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_wdtw_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    g: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::wdtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute WDDTW distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_wddtw_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    g: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::wddtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute ADTW distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_adtw_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    warp_penalty: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::adtw(x1, x2, sakoe_chiba_band, warp_penalty, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute MSM distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_msm_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    cost: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::msm(x1, x2, cost, parallel, "cpu") {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute TWE distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_twe_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    sakoe_chiba_band: f64,
+    stiffness: f64,
+    penalty: f64,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::twe(
+        x1,
+        x2,
+        sakoe_chiba_band,
+        stiffness,
+        penalty,
+        parallel,
+        "cpu",
+    ) {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute SBD distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_sbd_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
+
+    match core::sbd(x1, x2, parallel) {
+        Ok(result) => DistanceResult::success(result),
+        Err(_) => DistanceResult::error(1),
+    }
+}
+
+/// Compute MP distance matrix from ragged input.
+///
+/// # Safety
+/// Pointers must reference valid RaggedInput descriptors. x2 may be null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsd_mp_ragged(
+    x1: *const RaggedInput,
+    x2: *const RaggedInput,
+    window_size: usize,
+    parallel: bool,
+) -> DistanceResult {
+    let x1 = match unsafe { ragged_input_to_vecs(x1) } {
+        Ok(Some(v)) => v,
+        _ => return DistanceResult::error(3),
+    };
+    let x2 = match unsafe { ragged_input_to_vecs(x2) } {
+        Ok(v) => v,
+        Err(code) => return DistanceResult::error(code),
+    };
 
     match core::mp(x1, x2, window_size as i32, parallel) {
         Ok(result) => DistanceResult::success(result),

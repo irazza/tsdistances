@@ -128,6 +128,34 @@ X = randn(100, 200);  % 100 time series, each of length 200
 D = tsd_dtw(X);       % Returns 100×100 distance matrix
 ```
 
+### Variable-Length Time Series (Cell Arrays)
+
+```matlab
+% Build a cell array where each cell has a different length
+rng(42);
+n_series = 20;
+min_len = 60;
+max_len = 140;
+
+X = cell(n_series, 1);
+t_base = linspace(0, 4*pi, max_len);
+
+for i = 1:n_series
+  len = randi([min_len, max_len]);
+  t = t_base(1:len);
+  freq = 0.5 + rand() * 1.5;
+  phase = rand() * 2 * pi;
+  noise = 0.1 * randn(1, len);
+  X{i} = sin(freq * t + phase) + noise;
+end
+
+% Works for elastic distances (DTW family, ERP, LCSS, MSM, TWE, SBD, MP)
+D = tsd_dtw(X);
+```
+
+Mixed input mode is also supported (one input as matrix, the other as cell array).
+Euclidean and Catch-Euclidean require equal-length series and will raise an error when lengths differ.
+
 ### Compare Different Distance Measures
 
 ```matlab

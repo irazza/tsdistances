@@ -122,10 +122,18 @@ thread_local! {
 
 pub fn zscore(x: &[f64]) -> Vec<f64> {
     let mean = x.iter().sum::<f64>() / x.len() as f64;
-    let std = (x.iter().map(|val| (val - mean).powi(2)).sum::<f64>() / x.len() as f64).sqrt();
+    let std = (x
+        .iter()
+        .map(|val| {
+            let diff = val - mean;
+            diff * diff
+        })
+        .sum::<f64>()
+        / x.len() as f64)
+        .sqrt();
     x.iter().map(|val| (val - mean) / std).collect()
 }
 
 pub fn l2_norm(x: &[f64]) -> f64 {
-    x.iter().map(|val| val.powi(2)).sum::<f64>().sqrt()
+    x.iter().map(|val| val * val).sum::<f64>().sqrt()
 }

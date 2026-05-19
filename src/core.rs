@@ -135,7 +135,10 @@ pub fn euclidean(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Res
         |a, b| {
             a.iter()
                 .zip(b.iter())
-                .map(|(x, y)| (x - y).powi(2))
+                .map(|(x, y)| {
+                    let diff = x - y;
+                    diff * diff
+                })
                 .sum::<f64>()
                 .sqrt()
         },
@@ -194,7 +197,13 @@ pub fn catch_euclidean(
         .collect::<Vec<f64>>();
     let std_x1 = (0..catch22::N_CATCH22)
         .map(|i| {
-            let sum = x1.iter().map(|x| (x[i] - mean_x1[i]).powi(2)).sum::<f64>();
+            let sum = x1
+                .iter()
+                .map(|x| {
+                    let diff = x[i] - mean_x1[i];
+                    diff * diff
+                })
+                .sum::<f64>();
             (sum / x1.len() as f64).sqrt()
         })
         .collect::<Vec<f64>>();
@@ -224,7 +233,13 @@ pub fn catch_euclidean(
             .collect::<Vec<f64>>();
         let std_x2 = (0..catch22::N_CATCH22)
             .map(|i| {
-                let sum = x2.iter().map(|x| (x[i] - mean_x2[i]).powi(2)).sum::<f64>();
+                let sum = x2
+                    .iter()
+                    .map(|x| {
+                        let diff = x[i] - mean_x2[i];
+                        diff * diff
+                    })
+                    .sum::<f64>();
                 (sum / x2.len() as f64).sqrt()
             })
             .collect::<Vec<f64>>();
@@ -429,22 +444,7 @@ pub fn dtw(
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
-                |a, b| {
-                    let dtw_cost_func =
-                        |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
-                            let dist = (a[i] - b[j]).powi(2);
-                            dist + min(min(z, x), y)
-                        };
-                    diagonal::diagonal_distance::<WavefrontMatrix>(
-                        a,
-                        b,
-                        f64::INFINITY,
-                        sakoe_chiba_band,
-                        dtw_cost_func,
-                        dtw_cost_func,
-                        true,
-                    )
-                },
+                |a, b| diagonal::diagonal_distance_dtw(a, b, sakoe_chiba_band),
                 x1,
                 x2,
                 par,
@@ -519,7 +519,8 @@ pub fn wdtw(
 
                     let wdtw_cost_func =
                         |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
-                            let dist = (a[i] - b[j]).powi(2)
+                            let diff = a[i] - b[j];
+                            let dist = diff * diff
                                 * weights[(i as i32 - j as i32).unsigned_abs() as usize];
                             dist + min(min(z, x), y)
                         };
@@ -615,7 +616,8 @@ pub fn adtw(
                 |a, b| {
                     let adtw_cost_func =
                         |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
-                            let dist = (a[i] - b[j]).powi(2);
+                            let diff = a[i] - b[j];
+                            let dist = diff * diff;
                             dist + min(min(z + warp_penalty, x + warp_penalty), y)
                         };
 
@@ -929,7 +931,8 @@ fn mp_inner(a: &[f64], b: &[f64], window: usize) -> Vec<f64> {
         for (j, sw_b) in b.windows(window).enumerate() {
             let mut dist = 0.0;
             for (x, y) in sw_a.iter().zip(sw_b.iter()) {
-                dist += (((x - mean_a[i]) / std_a[i]) - ((y - mean_b[j]) / std_b[j])).powi(2);
+                let diff = ((x - mean_a[i]) / std_a[i]) - ((y - mean_b[j]) / std_b[j]);
+                dist += diff * diff;
             }
             dist = dist.sqrt();
             p_ab[i] = p_ab[i].min(dist);
@@ -971,4 +974,184 @@ fn mean_std_per_windows(a: &[f64], window: usize) -> (Vec<f64>, Vec<f64>) {
     }
 
     (means, stds)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_close(left: f64, right: f64) {
+        let diff = (left - right).abs();
+        assert!(
+            diff < 1e-8,
+            "left={left}, right={right}, abs_diff={diff}"
+        );
+    }
+
+    fn assert_matrix_close(left: &[Vec<f64>], right: &[Vec<f64>]) {
+        assert_eq!(left.len(), right.len());
+        for (left_row, right_row) in left.iter().zip(right.iter()) {
+            assert_eq!(left_row.len(), right_row.len());
+            for (&l, &r) in left_row.iter().zip(right_row.iter()) {
+                assert_close(l, r);
+            }
+        }
+    }
+
+    fn sample_xy() -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
+        (
+            vec![vec![1.0, 1.0, 1.0], vec![0.0, 1.0, 1.0]],
+            vec![vec![0.0, 1.0, 0.0], vec![-1.0, 0.0, 0.0]],
+        )
+    }
+
+    #[test]
+    fn euclidean_matches_doc_examples_and_pairwise_symmetry() {
+        let (x1, x2) = sample_xy();
+        let cross = euclidean(x1.clone(), Some(x2), false).unwrap();
+        let expected = vec![
+            vec![2.0_f64.sqrt(), 6.0_f64.sqrt()],
+            vec![1.0, 3.0_f64.sqrt()],
+        ];
+        assert_matrix_close(&cross, &expected);
+
+        let pairwise = euclidean(x1, None, false).unwrap();
+        assert_close(pairwise[0][0], 0.0);
+        assert_close(pairwise[1][1], 0.0);
+        assert_close(pairwise[0][1], pairwise[1][0]);
+        assert_close(pairwise[0][1], 1.0);
+    }
+
+    #[test]
+    fn dynamic_programming_distances_match_doc_examples() {
+        let a = vec![vec![1.0, 0.0, 0.0]];
+        let b = vec![vec![0.0, 1.0, 0.0]];
+
+        assert_close(erp(a.clone(), Some(b.clone()), 1.0, 0.0, false, "cpu").unwrap()[0][0], 2.0);
+        assert_close(lcss(a.clone(), Some(b.clone()), 1.0, 0.5, false, "cpu").unwrap()[0][0], 1.0 / 3.0);
+        assert_close(dtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0], 1.0);
+        let a_d = derivate(&a);
+        let b_d = derivate(&b);
+        assert_matrix_close(
+            &ddtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap(),
+            &dtw(a_d.clone(), Some(b_d.clone()), 1.0, false, "cpu").unwrap(),
+        );
+        assert_close(wdtw(a.clone(), Some(a.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0], 0.0);
+        assert!(wdtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0] >= 0.0);
+        assert_matrix_close(
+            &wddtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap(),
+            &wdtw(a_d, Some(b_d), 1.0, 0.05, false, "cpu").unwrap(),
+        );
+        assert_close(adtw(a.clone(), Some(a.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0], 0.0);
+        assert!(adtw(a.clone(), Some(b.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0] >= 0.0);
+        assert_close(msm(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0], 2.0);
+        assert_close(
+            twe(a.clone(), Some(b), 1.0, 0.001, 1.0, false, "cpu").unwrap()[0][0],
+            4.0,
+        );
+    }
+
+    #[test]
+    fn par_and_seq_match_for_core_cpu_distances() {
+        let x = vec![
+            vec![0.0, 1.0, 2.0, 3.0],
+            vec![1.0, 2.0, 1.0, 0.0],
+            vec![3.0, 1.0, 0.0, 1.0],
+        ];
+        let y = vec![
+            vec![0.0, 0.5, 1.5, 3.0],
+            vec![2.0, 1.0, 0.5, 0.0],
+        ];
+
+        assert_matrix_close(
+            &euclidean(x.clone(), Some(y.clone()), false).unwrap(),
+            &euclidean(x.clone(), Some(y.clone()), true).unwrap(),
+        );
+        assert_matrix_close(
+            &dtw(x.clone(), Some(y.clone()), 1.0, false, "cpu").unwrap(),
+            &dtw(x.clone(), Some(y.clone()), 1.0, true, "cpu").unwrap(),
+        );
+        assert_matrix_close(
+            &sbd(x.clone(), Some(y.clone()), false).unwrap(),
+            &sbd(x.clone(), Some(y.clone()), true).unwrap(),
+        );
+        assert_matrix_close(
+            &mp(x.clone(), Some(y.clone()), 2, false).unwrap(),
+            &mp(x, Some(y), 2, true).unwrap(),
+        );
+    }
+
+    #[test]
+    fn catch_euclidean_and_sbd_have_zero_diagonal() {
+        let x = vec![
+            vec![0.0, 1.0, 2.0, 3.0],
+            vec![1.0, 2.0, 1.0, 0.0],
+            vec![3.0, 1.0, 0.0, 1.0],
+        ];
+
+        for matrix in [
+            catch_euclidean(x.clone(), None, false).unwrap(),
+            sbd(x, None, false).unwrap(),
+        ] {
+            for i in 0..matrix.len() {
+                assert_close(matrix[i][i], 0.0);
+                for j in 0..matrix.len() {
+                    assert_close(matrix[i][j], matrix[j][i]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn parameter_validation_returns_expected_errors() {
+        let x = vec![vec![0.0, 1.0, 2.0]];
+        let y = Some(vec![vec![0.0, 1.0, 2.0]]);
+
+        assert!(matches!(
+            erp(x.clone(), y.clone(), 1.0, -1.0, false, "cpu"),
+            Err(DistanceError::InvalidParameter(msg)) if msg.contains("Gap penalty")
+        ));
+        assert!(matches!(
+            lcss(x.clone(), y.clone(), 1.0, -0.1, false, "cpu"),
+            Err(DistanceError::InvalidParameter(msg)) if msg.contains("Epsilon")
+        ));
+        assert!(matches!(
+            dtw(x.clone(), y.clone(), 1.1, false, "cpu"),
+            Err(DistanceError::InvalidParameter(msg)) if msg.contains("Sakoe-Chiba")
+        ));
+        assert!(matches!(
+            adtw(x.clone(), y.clone(), 1.0, -0.1, false, "cpu"),
+            Err(DistanceError::InvalidParameter(msg)) if msg.contains("Warp penalty")
+        ));
+        assert!(matches!(
+            twe(x.clone(), y.clone(), 1.0, -0.1, 1.0, false, "cpu"),
+            Err(DistanceError::InvalidParameter(msg)) if msg.contains("Stiffness")
+        ));
+        assert!(matches!(
+            twe(x.clone(), y.clone(), 1.0, 0.1, -1.0, false, "cpu"),
+            Err(DistanceError::InvalidParameter(msg)) if msg.contains("Penalty")
+        ));
+        assert!(matches!(
+            msm(x.clone(), y.clone(), 0.5, false, "bogus"),
+            Err(DistanceError::InvalidParameter(msg)) if msg.contains("Device")
+        ));
+    }
+
+    #[test]
+    fn mean_std_per_windows_matches_manual_values() {
+        let (means, stds) = mean_std_per_windows(&[1.0, 3.0, 5.0, 7.0], 2);
+        assert_matrix_close(
+            &[means, stds],
+            &[
+                vec![2.0, 4.0, 6.0],
+                vec![1.0, 1.0, 1.0],
+            ],
+        );
+    }
+
+    #[test]
+    fn mp_inner_returns_zero_for_identical_series() {
+        let values = mp_inner(&[1.0, 2.0, 3.0, 4.0], &[1.0, 2.0, 3.0, 4.0], 2);
+        assert!(values.iter().all(|v| v.abs() < 1e-8));
+    }
 }

@@ -40,6 +40,12 @@ def check_input(
         raise ValueError("`u` must be 1-D or 2-D.")
 
 
+def _to_backend_inputs(
+    u: np.ndarray, v: Optional[np.ndarray]
+) -> tuple[list[list[float]], Optional[list[list[float]]]]:
+    return u.tolist(), None if v is None else v.tolist()
+
+
 @typechecked
 def euclidean_distance(
     u: ArrayLike, v: Optional[ArrayLike] = None, par: Optional[bool] = True
@@ -76,14 +82,15 @@ def euclidean_distance(
 
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.euclidean(_u, _v, par)[0][0]
-        return np.array(tsd.euclidean(_u, _v, par))
+            return tsd.euclidean(_u_backend, _v_backend, par)[0][0]
+        return np.array(tsd.euclidean(_u_backend, _v_backend, par))
     if _v is None:
-        return np.array(tsd.euclidean(_u, None, par))
-    return np.array(tsd.euclidean(_u, _v, par))
+        return np.array(tsd.euclidean(_u_backend, None, par))
+    return np.array(tsd.euclidean(_u_backend, _v_backend, par))
 
 
 @typechecked
@@ -120,14 +127,15 @@ def catcheucl_distance(
 
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.catch_euclidean(_u, _v, par)[0][0]
-        return np.array(tsd.catch_euclidean(_u, _v, par))
+            return tsd.catch_euclidean(_u_backend, _v_backend, par)[0][0]
+        return np.array(tsd.catch_euclidean(_u_backend, _v_backend, par))
     if _v is None:
-        return np.array(tsd.catch_euclidean(_u, None, par))
-    return np.array(tsd.catch_euclidean(_u, _v, par))
+        return np.array(tsd.catch_euclidean(_u_backend, None, par))
+    return np.array(tsd.catch_euclidean(_u_backend, _v_backend, par))
 
 
 @typechecked
@@ -175,20 +183,21 @@ def erp_distance(
     array([[0.0, 1.0], [1.0, 0.0]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.erp(_u, _v, band, gap_penalty, par, device)[0][0]
+            return tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.erp(_u, _v, band, gap_penalty, par, device))
+            return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.erp(_u, _v, band, gap_penalty, par, device))
+            return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.erp(_u, _v, band, gap_penalty, par, device))
+                return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.erp(_u, _v, band, gap_penalty, par, device))
+                return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
 
 
 @typechecked
@@ -235,20 +244,21 @@ def lcss_distance(
     array([[0.0, 0.3333333333333333], [0.3333333333333333, 0.0]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.lcss(_u, _v, band, epsilon, par, device)[0][0]
+            return tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.lcss(_u, _v, band, epsilon, par, device))
+            return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.lcss(_u, _v, band, epsilon, par, device))
+            return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.lcss(_u, _v, band, epsilon, par, device))
+                return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.lcss(_u, _v, band, epsilon, par, device))
+                return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
 
 
 @typechecked
@@ -293,20 +303,21 @@ def dtw_distance(
     array([[0.        , 1.        ], [1.        , 0.        ]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.dtw(_u, _v, band, par, device)[0][0]
+            return tsd.dtw(_u_backend, _v_backend, band, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.dtw(_u, _v, band, par, device))
+            return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.dtw(_u, _v, band, par, device))
+            return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.dtw(_u, _v, band, par, device))
+                return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.dtw(_u, _v, band, par, device))
+                return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
 
 
 @typechecked
@@ -344,27 +355,30 @@ def ddtw_distance(
     Examples
     --------
     >>> ddtw_distance([1, 0, 0], [0, 1, 0])
-    4.6875
+    1.5625
     >>> ddtw_distance([[1, 1, 1], [0, 1, 1]], [[0, 1, 0], [-1, 0, 0]])
-    array([[0.75, 1.6875], [0.1875, 0.0]])
+    array([[0.25  , 0.5625],
+           [0.0625, 0.    ]])
     >>> ddtw_distance([[1, 1, 1], [0, 1, 1]])
-    array([[0.0, 1.6875], [1.6875, 0.0]])
+    array([[0.    , 0.5625],
+           [0.5625, 0.    ]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.ddtw(_u, _v, band, par, device)[0][0]
+            return tsd.ddtw(_u_backend, _v_backend, band, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.ddtw(_u, _v, band, par, device))
+            return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.ddtw(_u, _v, band, par, device))
+            return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.ddtw(_u, _v, band, par, device))
+                return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.ddtw(_u, _v, band, par, device))
+                return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
 
 
 @typechecked
@@ -403,27 +417,30 @@ def wdtw_distance(
     Examples
     --------
     >>> wdtw_distance([1, 0, 0], [0, 1, 0])
-    0.18242552380635635
+    0.4812587841214648
     >>> wdtw_distance([[1, 1, 1], [0, 1, 1]], [[0, 1, 0], [-1, 0, 0]])
-    array([[0.3648510476127127, 1.094553142838138], [0.18242552380635635, 0.547276571419069]])
+    array([[0.96251757, 2.8875527 ],
+           [0.48125878, 1.44377635]])
     >>> wdtw_distance([[1, 1, 1], [0, 1, 1]])
-    array([[0.0, 0.18242552380635635], [0.18242552380635635, 0.0]])
+    array([[0.        , 0.48125878],
+           [0.48125878, 0.        ]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.wdtw(_u, _v, band, g, par, device)[0][0]
+            return tsd.wdtw(_u_backend, _v_backend, band, g, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.wdtw(_u, _v, band, g, par, device))
+            return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.wdtw(_u, _v, band, g, par, device))
+            return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.wdtw(_u, _v, band, g, par, device))
+                return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.wdtw(_u, _v, band, g, par, device))
+                return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
 
 
 @typechecked
@@ -461,27 +478,30 @@ def wddtw_distance(
     Examples
     --------
     >>> wddtw_distance([1, 0, 0], [0, 1, 0])
-    0.8551196428422955
+    0.7714848835945151
     >>> wddtw_distance([[1, 1, 1], [0, 1, 1]], [[0, 1, 0], [-1, 0, 0]])
-    array([[0.13681914285476726, 0.3078430714232263], [0.034204785713691815, 0.0]])
+    array([[0.12343758, 0.27773456],
+           [0.0308594 , 0.        ]])
     >>> wddtw_distance([[1, 1, 1], [0, 1, 1]])
-    array([[0.0, 0.3078430714232263], [0.3078430714232263, 0.0]])
+    array([[0.        , 0.27773456],
+           [0.27773456, 0.        ]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.wddtw(_u, _v, band, g, par, device)[0][0]
+            return tsd.wddtw(_u_backend, _v_backend, band, g, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.wddtw(_u, _v, band, g, par, device))
+            return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.wddtw(_u, _v, band, g, par, device))
+            return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.wddtw(_u, _v, band, g, par, device))
+                return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.wddtw(_u, _v, band, g, par, device))
+                return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
 
 
 @typechecked
@@ -522,27 +542,30 @@ def adtw_distance(
     Examples
     --------
     >>> adtw_distance([1, 0, 0], [0, 1, 0])
-    0.0
+    2.0
     >>> adtw_distance([[1, 1, 1], [0, 1, 1]], [[0, 1, 0], [-1, 0, 0]])
-    array([[0.0, 0.0], [0.0, 0.0]])
+    array([[2., 6.],
+           [1., 3.]])
     >>> adtw_distance([[1, 1, 1], [0, 1, 1]])
-    array([[0.0, 0.0], [0.0, 0.0]])
+    array([[0., 1.],
+           [1., 0.]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.adtw(_u, _v, band, warp_penalty, par, device)[0][0]
+            return tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.adtw(_u, _v, band, warp_penalty, par, device))
+            return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.adtw(_u, _v, band, warp_penalty, par, device))
+            return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.adtw(_u, _v, band, warp_penalty, par, device))
+                return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.adtw(_u, _v, band, warp_penalty, par, device))
+                return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
 
 
 @typechecked
@@ -587,20 +610,21 @@ def msm_distance(
     array([[0.0, 1.0], [1.0, 0.0]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.msm(_u, _v, band, par, device)[0][0]
+            return tsd.msm(_u_backend, _v_backend, band, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.msm(_u, _v, band, par, device))
+            return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.msm(_u, _v, band, par, device))
+            return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.msm(_u, _v, band, par, device))
+                return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.msm(_u, _v, band, par, device))
+                return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
 
 
 @typechecked
@@ -651,20 +675,21 @@ def twe_distance(
     array([[0.0, 2.0], [2.0, 0.0]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.twe(_u, _v, band, stifness, penalty, par, device)[0][0]
+            return tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.twe(_u, _v, band, stifness, penalty, par, device))
+            return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.twe(_u, _v, band, stifness, penalty, par, device))
+            return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.twe(_u, _v, band, stifness, penalty, par, device))
+                return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.twe(_u, _v, band, stifness, penalty, par, device))
+                return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
 
 
 @typechecked
@@ -705,20 +730,21 @@ def sb_distance(
     array([[0.        , 1.        ], [1.        , 0.        ]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.sb(_u, _v, par)[0][0]
+            return tsd.sb(_u_backend, _v_backend, par)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.sb(_u, _v, par))
+            return np.array(tsd.sb(_u_backend, _v_backend, par))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.sb(_u, _v, par))
+            return np.array(tsd.sb(_u_backend, _v_backend, par))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.sb(_u, _v, par))
+                return np.array(tsd.sb(_u_backend, _v_backend, par))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.sb(_u, _v, par))
+                return np.array(tsd.sb(_u_backend, _v_backend, par))
 
 
 def mp_distance(
@@ -764,20 +790,21 @@ def mp_distance(
     p array([[0.        , 1.        ], [1.        , 0.        ]])
     """
     _u, _v = check_input(u, v)
+    _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
     if _u.shape[0] == 1:
         if _v.shape[0] == 1:
-            return tsd.mp(_u, window, _v, par)[0][0]
+            return tsd.mp(_u_backend, window, _v_backend, par)[0][0]
         elif v.shape[0] >= 2:
-            return np.array(tsd.mp(_u, window, _v, par))
+            return np.array(tsd.mp(_u_backend, window, _v_backend, par))
     elif _u.shape[0] >= 2:
         if _v is None:
-            return np.array(tsd.mp(_u, window, _v, par))
+            return np.array(tsd.mp(_u_backend, window, _v_backend, par))
         else:
             if _v.shape[0] == 1:
-                return np.array(tsd.mp(_u, window, _v, par))
+                return np.array(tsd.mp(_u_backend, window, _v_backend, par))
             elif _v.shape[0] >= 2:
-                return np.array(tsd.mp(_u, window, _v, par))
+                return np.array(tsd.mp(_u_backend, window, _v_backend, par))
 
 
 __all__ = [

@@ -162,3 +162,135 @@ fn diagonal_distance_<M: Matrix>(
 
     matrix.get_diagonal_cell(rx, cx)
 }
+
+pub fn diagonal_distance_dtw(a: &[f64], b: &[f64], sakoe_chiba_band: f64) -> f64 {
+    assert!(a.len() <= b.len());
+
+    let a_len = a.len();
+    let b_len = b.len();
+    let init_val = f64::INFINITY;
+    let mut matrix = WavefrontMatrix::new(a_len, b_len, init_val);
+
+    let mut upper_bound = 0.0;
+    for i in 0..a_len {
+        let diff = a[i] - b[i];
+        upper_bound += diff * diff;
+    }
+    if b_len > a_len {
+        let a_last = a[a_len - 1];
+        for &b_j in &b[a_len..] {
+            let diff = a_last - b_j;
+            upper_bound += diff * diff;
+        }
+    }
+
+    let mut i = 0;
+    let mut j = 0;
+    let mut s = 0;
+    let mut e = 0;
+
+    matrix.set_diagonal_cell(0, 0, 0.0);
+
+    let start_coord = WavefrontMatrix::index_mat_to_diag(0, 0).1;
+    let end_coord = WavefrontMatrix::index_mat_to_diag(a_len, b_len).1;
+    let band_size = sakoe_chiba_band * (a_len as f64);
+
+    let mut bound_indexes = [(isize::MIN, isize::MAX), (isize::MIN, isize::MAX)];
+    let mut parity = 0;
+
+    for d in 2..(a_len + b_len + 1) {
+        matrix.set_diagonal_cell(d, d as isize, init_val);
+
+        let (s_, e_) = if sakoe_chiba_band < 1.0 {
+            let mid_coord = start_coord as f64
+                + (end_coord as f64 - start_coord as f64) / (a_len + b_len) as f64 * d as f64;
+            (
+                s.max((mid_coord - band_size).floor() as isize),
+                e.min((mid_coord + band_size).ceil() as isize),
+            )
+        } else {
+            (s, e)
+        };
+
+        let mut i1: usize = i;
+        let mut j1 = j;
+        let mut s_step = s;
+
+        for k in (s..s_).step_by(2) {
+            matrix.set_diagonal_cell(d, k, init_val);
+            i1 = i1.wrapping_sub(1);
+            j1 += 1;
+            s_step += 2;
+        }
+
+        let mut first_cell = e_;
+        let mut last_cell = s_step;
+
+        let lower_bound_index = bound_indexes[0].0.min(bound_indexes[1].0).max(s_step);
+        let upper_bound_index = bound_indexes[0].1.max(bound_indexes[1].1).min(e_);
+        let s_step_loop_skips = (lower_bound_index - s_step + 1) / 2;
+
+        let mut s_step = s_step + s_step_loop_skips * 2;
+        let e_ = upper_bound_index;
+
+        i1 = i1.wrapping_sub(s_step_loop_skips as usize);
+        j1 += s_step_loop_skips as usize;
+
+        for k in (s_step..e_ + 1).step_by(2) {
+            let dleft = matrix.get_diagonal_cell(d - 1, k - 1);
+            let ddiag = matrix.get_diagonal_cell(d - 2, k);
+            let dup = matrix.get_diagonal_cell(d - 1, k + 1);
+
+            let diff = a[i1] - b[j1];
+            let prev = if dleft < ddiag {
+                if dleft < dup { dleft } else { dup }
+            } else if ddiag < dup {
+                ddiag
+            } else {
+                dup
+            };
+            let dist = diff * diff + prev;
+
+            if dist <= upper_bound {
+                if k < first_cell {
+                    first_cell = k;
+                }
+                if k > last_cell {
+                    last_cell = k;
+                }
+            }
+
+            matrix.set_diagonal_cell(d, k, dist);
+
+            i1 = i1.wrapping_sub(1);
+            j1 += 1;
+            s_step += 2;
+        }
+
+        let next_parity = parity ^ 1;
+        bound_indexes[next_parity].0 = first_cell - 1;
+        bound_indexes[next_parity].1 = last_cell + 1;
+        parity = next_parity;
+
+        for k in (s_step..(e + 1)).step_by(2) {
+            matrix.set_diagonal_cell(d, k, init_val);
+        }
+
+        if d <= a_len {
+            i += 1;
+            s -= 1;
+            e += 1;
+        } else if d <= b_len {
+            j += 1;
+            s += 1;
+            e += 1;
+        } else {
+            j += 1;
+            s += 1;
+            e -= 1;
+        }
+    }
+
+    let (rx, cx) = WavefrontMatrix::index_mat_to_diag(a_len, b_len);
+    matrix.get_diagonal_cell(rx, cx)
+}

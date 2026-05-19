@@ -444,23 +444,7 @@ pub fn dtw(
     match device {
         "cpu" => {
             let distance_matrix = compute_distance(
-                |a, b| {
-                    let dtw_cost_func =
-                        |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
-                            let diff = a[i] - b[j];
-                            let dist = diff * diff;
-                            dist + min(min(z, x), y)
-                        };
-                    diagonal::diagonal_distance::<WavefrontMatrix>(
-                        a,
-                        b,
-                        f64::INFINITY,
-                        sakoe_chiba_band,
-                        dtw_cost_func,
-                        dtw_cost_func,
-                        true,
-                    )
-                },
+                |a, b| diagonal::diagonal_distance_dtw(a, b, sakoe_chiba_band),
                 x1,
                 x2,
                 par,

@@ -3,7 +3,7 @@
 extern crate test;
 
 use test::{Bencher, black_box};
-use tsdistances::{core, diagonal, matrix::WavefrontMatrix};
+use tsdistances::{core, diagonal};
 
 fn build_series(count: usize, len: usize, seed: u64) -> Vec<Vec<f64>> {
     let mut state = seed;
@@ -24,25 +24,16 @@ fn build_series(count: usize, len: usize, seed: u64) -> Vec<Vec<f64>> {
     out
 }
 
-fn dtw_cost(a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64) -> f64 {
-    let diff = a[i] - b[j];
-    diff * diff + z.min(x).min(y)
-}
-
 #[bench]
 fn bench_diagonal_dtw_kernel_len512(b: &mut Bencher) {
     let a = build_series(1, 512, 1).pop().unwrap();
     let c = build_series(1, 512, 2).pop().unwrap();
 
     b.iter(|| {
-        black_box(diagonal::diagonal_distance::<WavefrontMatrix>(
+        black_box(diagonal::diagonal_distance_dtw(
             black_box(&a),
             black_box(&c),
-            black_box(f64::INFINITY),
             black_box(1.0),
-            dtw_cost,
-            dtw_cost,
-            black_box(true),
         ))
     });
 }

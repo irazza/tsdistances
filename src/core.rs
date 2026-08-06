@@ -32,6 +32,10 @@ impl std::error::Error for DistanceError {}
 
 pub type Result<T> = std::result::Result<T, DistanceError>;
 
+// Only the non-GPU build routes "gpu" requests through this helper; with the
+// `gpu` feature enabled the call sites below are compiled out, so gate the
+// function to match and avoid a dead-code error under `-D warnings`.
+#[cfg(not(feature = "gpu"))]
 fn gpu_feature_error() -> DistanceError {
     DistanceError::InvalidParameter("GPU support is not enabled in this build".to_string())
 }

@@ -371,7 +371,10 @@ pub fn lcss(
                             (dist <= epsilon) as i32 as f64 * (y + 1.0)
                                 + (dist > epsilon) as i32 as f64 * max(x, z)
                         };
-                    let max_len = max(a.len(), b.len()) as f64;
+                    // Normalize by the shorter series length to match aeon
+                    // (`1 - lcss / min(x_size, y_size)`). For equal-length
+                    // inputs this is identical to normalizing by the max.
+                    let norm_len = min(a.len(), b.len()) as f64;
                     let similarity = diagonal::diagonal_distance::<WavefrontMatrix>(
                         a,
                         b,
@@ -381,7 +384,7 @@ pub fn lcss(
                         lcss_cost_func,
                         false,
                     );
-                    1.0 - similarity / max_len
+                    1.0 - similarity / norm_len
                 },
                 x1,
                 x2,
@@ -904,9 +907,14 @@ pub fn mp(
             let n_a = a.len();
             let n_b = b.len();
             let mut p_abba = mp_inner(a, b, window);
+            // `mp_inner` clamps the window to the shorter series, so the joint
+            // matrix profile has `(n_a - w + 1) + (n_b - w + 1)` entries. Use the
+            // same clamped window here to pick the selection index; otherwise a
+            // window larger than a series underflows the usize subtraction.
+            let w = window.min(n_a).min(n_b);
             let n = min(
                 (threshold * (n_a + n_b) as f64).ceil() as usize,
-                n_a - window + 1 + n_b - window + 1 - 1,
+                (n_a - w + 1) + (n_b - w + 1) - 1,
             );
             *p_abba
                 .select_nth_unstable_by(n, |x, y| x.partial_cmp(y).unwrap())
@@ -1163,5 +1171,26 @@ mod tests {
     fn mp_inner_returns_zero_for_identical_series() {
         let values = mp_inner(&[1.0, 2.0, 3.0, 4.0], &[1.0, 2.0, 3.0, 4.0], 2);
         assert!(values.iter().all(|v| v.abs() < 1e-8));
+    }
+
+    #[test]
+    fn lcss_normalizes_by_shorter_series() {
+        // The shorter series is an exact prefix of the longer one, so the LCSS
+        // equals the shorter length. Normalizing by the shorter length (as aeon
+        // does) yields distance 0; the old max-length normalization would not.
+        let a = vec![vec![0.0, 1.0, 2.0]];
+        let b = vec![vec![0.0, 1.0, 2.0, 9.0, 9.0]];
+        let d = lcss(a, Some(b), 1.0, 0.5, false, "cpu").unwrap();
+        assert_close(d[0][0], 0.0);
+    }
+
+    #[test]
+    fn mp_handles_window_larger_than_series() {
+        // A window larger than the series must clamp rather than underflow the
+        // usize subtraction when picking the selection index.
+        let x = vec![vec![1.0, 2.0, 3.0]];
+        let y = vec![vec![3.0, 2.0, 1.0]];
+        let d = mp(x, Some(y), 20, false).unwrap();
+        assert!(d[0][0].is_finite());
     }
 }

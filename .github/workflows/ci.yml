@@ -19,7 +19,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  RUST_TOOLCHAIN: nightly-2025-06-30
+  RUST_TOOLCHAIN: nightly-2026-05-22
 
 jobs:
   # --- Rust checks, split so a formatting nit can no longer gate the whole

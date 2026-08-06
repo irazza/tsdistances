@@ -165,7 +165,7 @@ dependencies = [
 [[package]]
 name = "catch22"
 version = "0.1.0"
-source = "git+https://github.com/albertoazzari/catch22_rs.git#66b286c56f4751647654471632de37f5d97b23c6"
+source = "git+https://github.com/irazza/pycatch22-rs.git#b45fcabefa761dba99013f2d8bee6eb853722296"
 dependencies = [
  "rustfft",
 ]

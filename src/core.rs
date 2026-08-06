@@ -149,6 +149,23 @@ pub fn euclidean(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Res
     Ok(distance_matrix)
 }
 
+/// Extract the catch22/catch24 feature vector for a single series.
+///
+/// Uses the catch22 crate's standard normalized pipeline (features 0..21 on the
+/// z-scored series, plus raw mean/std/slope), matching the reference C
+/// implementation and `pycatch22`. Any input the crate rejects (series shorter
+/// than the minimum length, non-finite or constant series) yields an all-zero
+/// feature vector, and any individual non-finite feature is replaced with 0.0.
+/// Both `x1` and `x2` go through this same path, so identical series always map
+/// to identical features regardless of which argument they came from.
+fn catch22_features(x: &[f64]) -> Vec<f64> {
+    let features = catch22::compute_all_normalized(x).unwrap_or([0.0; catch22::N_CATCH22]);
+    features
+        .iter()
+        .map(|&value| if value.is_finite() { value } else { 0.0 })
+        .collect()
+}
+
 /// Compute Catch22-Euclidean distance matrix
 pub fn catch_euclidean(
     x1: Vec<Vec<f64>>,
@@ -157,35 +174,13 @@ pub fn catch_euclidean(
 ) -> Result<Vec<Vec<f64>>> {
     let x1 = x1
         .iter()
-        .map(|x| {
-            let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
-            for i in 0..catch22::N_CATCH22 {
-                let value = catch22::compute(x, i);
-                if value.is_nan() {
-                    transformed_x.push(0.0);
-                } else {
-                    transformed_x.push(value);
-                }
-            }
-            transformed_x
-        })
-        .collect::<Vec<Vec<_>>>();
+        .map(|x| catch22_features(x))
+        .collect::<Vec<Vec<f64>>>();
 
     let x2 = x2.map(|x2| {
         x2.iter()
-            .map(|x| {
-                let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
-                for i in 0..catch22::N_CATCH22 {
-                    let value = catch22::compute(x, i);
-                    if value.is_finite() {
-                        transformed_x.push(value);
-                    } else {
-                        transformed_x.push(0.0);
-                    }
-                }
-                transformed_x
-            })
-            .collect::<Vec<Vec<_>>>()
+            .map(|x| catch22_features(x))
+            .collect::<Vec<Vec<f64>>>()
     });
 
     // Z-Normalize on the column-wise
@@ -513,10 +508,18 @@ pub fn wdtw(
 
     match device {
         "cpu" => {
+            // Compute the weight profile once, over the longest series across
+            // both sets. This matches the Python bindings' historical numeric
+            // behavior (a single global weight vector) and avoids recomputing
+            // the weights for every pair. For equal-length inputs (all current
+            // tests and the MATLAB FFI) this is identical to the per-pair form.
+            let mut max_len = x1.iter().map(|v| v.len()).max().unwrap_or(0);
+            if let Some(x2) = &x2 {
+                max_len = max_len.max(x2.iter().map(|v| v.len()).max().unwrap_or(0));
+            }
+            let weights = dtw_weights(max_len, g);
             let distance_matrix = compute_distance(
                 |a, b| {
-                    let weights = dtw_weights(a.len().max(b.len()), g);
-
                     let wdtw_cost_func =
                         |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
                             let diff = a[i] - b[j];

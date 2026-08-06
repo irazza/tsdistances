@@ -40,8 +40,8 @@ impl DistanceResult {
         // Flatten the 2D vector to 1D (column-major for MATLAB)
         let mut flat_data: Vec<f64> = Vec::with_capacity(rows * cols);
         for col in 0..cols {
-            for row in 0..rows {
-                flat_data.push(data[row][col]);
+            for data_row in &data {
+                flat_data.push(data_row[col]);
             }
         }
 
@@ -195,10 +195,10 @@ fn validate_equal_lengths(x1: &[Vec<f64>], x2: Option<&[Vec<f64>]>) -> bool {
         return false;
     }
 
-    if let Some(x2) = x2 {
-        if x2.iter().any(|series| series.len() != first_len) {
-            return false;
-        }
+    if let Some(x2) = x2
+        && x2.iter().any(|series| series.len() != first_len)
+    {
+        return false;
     }
 
     true

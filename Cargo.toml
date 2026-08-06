@@ -10,7 +10,7 @@ authors = [
 ]
 
 [dependencies]
-catch22 = { git = "https://github.com/albertoazzari/catch22_rs.git", version = "0.1.0" }
+catch22 = { git = "https://github.com/irazza/pycatch22-rs.git", package = "catch22" }
 ctrlc = { version = "3.4.7", optional = true }
 parking_lot = "0.12.4"
 pyo3 = { version = "0.27.2", features = ["extension-module"], optional = true }

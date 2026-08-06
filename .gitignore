@@ -3,6 +3,7 @@ target/
 .vscode/
 *.csv
 *.so
+*.pyd
 __pycache__/
 compute_ee.py
 .history/

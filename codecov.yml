@@ -1,0 +1,33 @@
+# Codecov configuration.
+#
+# Coverage is reported under two flags:
+#   * rust   - the core algorithms in src/ (cargo-llvm-cov)
+#   * python - the wrapper package in python/tsdistances (pytest-cov)
+#
+# Thresholds are informational to start with, so coverage never fails CI while
+# the baseline is being established. Tighten (drop `informational: true`) once
+# the numbers stabilize.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+        target: auto
+    patch:
+      default:
+        informational: true
+        target: auto
+
+flags:
+  rust:
+    paths:
+      - src/
+    carryforward: true
+  python:
+    paths:
+      - python/
+    carryforward: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: false

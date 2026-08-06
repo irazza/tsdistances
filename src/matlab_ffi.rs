@@ -146,7 +146,9 @@ unsafe fn ragged_input_to_vecs(input: *const RaggedInput) -> Result<Option<Vec<V
     }
 
     let lengths = unsafe { slice::from_raw_parts(input.lengths, input.rows) };
-    let expected_total = lengths.iter().try_fold(0usize, |acc, len| acc.checked_add(*len));
+    let expected_total = lengths
+        .iter()
+        .try_fold(0usize, |acc, len| acc.checked_add(*len));
     let expected_total = match expected_total {
         Some(v) => v,
         None => return Err(3),
@@ -180,7 +182,10 @@ unsafe fn ragged_input_to_vecs(input: *const RaggedInput) -> Result<Option<Vec<V
 }
 
 fn validate_equal_lengths(x1: &[Vec<f64>], x2: Option<&[Vec<f64>]>) -> bool {
-    let first_len = x1.first().map(|v| v.len()).or_else(|| x2.and_then(|v| v.first().map(|s| s.len())));
+    let first_len = x1
+        .first()
+        .map(|v| v.len())
+        .or_else(|| x2.and_then(|v| v.first().map(|s| s.len())));
 
     let Some(first_len) = first_len else {
         return true;

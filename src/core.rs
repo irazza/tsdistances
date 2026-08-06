@@ -520,7 +520,8 @@ pub fn wdtw(
                     let wdtw_cost_func =
                         |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
                             let diff = a[i] - b[j];
-                            let dist = diff * diff
+                            let dist = diff
+                                * diff
                                 * weights[(i as i32 - j as i32).unsigned_abs() as usize];
                             dist + min(min(z, x), y)
                         };
@@ -982,10 +983,7 @@ mod tests {
 
     fn assert_close(left: f64, right: f64) {
         let diff = (left - right).abs();
-        assert!(
-            diff < 1e-8,
-            "left={left}, right={right}, abs_diff={diff}"
-        );
+        assert!(diff < 1e-8, "left={left}, right={right}, abs_diff={diff}");
     }
 
     fn assert_matrix_close(left: &[Vec<f64>], right: &[Vec<f64>]) {
@@ -1027,24 +1025,42 @@ mod tests {
         let a = vec![vec![1.0, 0.0, 0.0]];
         let b = vec![vec![0.0, 1.0, 0.0]];
 
-        assert_close(erp(a.clone(), Some(b.clone()), 1.0, 0.0, false, "cpu").unwrap()[0][0], 2.0);
-        assert_close(lcss(a.clone(), Some(b.clone()), 1.0, 0.5, false, "cpu").unwrap()[0][0], 1.0 / 3.0);
-        assert_close(dtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0], 1.0);
+        assert_close(
+            erp(a.clone(), Some(b.clone()), 1.0, 0.0, false, "cpu").unwrap()[0][0],
+            2.0,
+        );
+        assert_close(
+            lcss(a.clone(), Some(b.clone()), 1.0, 0.5, false, "cpu").unwrap()[0][0],
+            1.0 / 3.0,
+        );
+        assert_close(
+            dtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0],
+            1.0,
+        );
         let a_d = derivate(&a);
         let b_d = derivate(&b);
         assert_matrix_close(
             &ddtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap(),
             &dtw(a_d.clone(), Some(b_d.clone()), 1.0, false, "cpu").unwrap(),
         );
-        assert_close(wdtw(a.clone(), Some(a.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0], 0.0);
+        assert_close(
+            wdtw(a.clone(), Some(a.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0],
+            0.0,
+        );
         assert!(wdtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0] >= 0.0);
         assert_matrix_close(
             &wddtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap(),
             &wdtw(a_d, Some(b_d), 1.0, 0.05, false, "cpu").unwrap(),
         );
-        assert_close(adtw(a.clone(), Some(a.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0], 0.0);
+        assert_close(
+            adtw(a.clone(), Some(a.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0],
+            0.0,
+        );
         assert!(adtw(a.clone(), Some(b.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0] >= 0.0);
-        assert_close(msm(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0], 2.0);
+        assert_close(
+            msm(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0],
+            2.0,
+        );
         assert_close(
             twe(a.clone(), Some(b), 1.0, 0.001, 1.0, false, "cpu").unwrap()[0][0],
             4.0,
@@ -1058,10 +1074,7 @@ mod tests {
             vec![1.0, 2.0, 1.0, 0.0],
             vec![3.0, 1.0, 0.0, 1.0],
         ];
-        let y = vec![
-            vec![0.0, 0.5, 1.5, 3.0],
-            vec![2.0, 1.0, 0.5, 0.0],
-        ];
+        let y = vec![vec![0.0, 0.5, 1.5, 3.0], vec![2.0, 1.0, 0.5, 0.0]];
 
         assert_matrix_close(
             &euclidean(x.clone(), Some(y.clone()), false).unwrap(),
@@ -1140,13 +1153,7 @@ mod tests {
     #[test]
     fn mean_std_per_windows_matches_manual_values() {
         let (means, stds) = mean_std_per_windows(&[1.0, 3.0, 5.0, 7.0], 2);
-        assert_matrix_close(
-            &[means, stds],
-            &[
-                vec![2.0, 4.0, 6.0],
-                vec![1.0, 1.0, 1.0],
-            ],
-        );
+        assert_matrix_close(&[means, stds], &[vec![2.0, 4.0, 6.0], vec![1.0, 1.0, 1.0]]);
     }
 
     #[test]

@@ -1961,7 +1961,7 @@ dependencies = [
 [[package]]
 name = "tsdistances_gpu"
 version = "0.1.0"
-source = "git+https://github.com/irazza/tsdistances_gpu.git#02cf47b4b7dacfd8bd7df27d9f57c346934119d6"
+source = "git+https://github.com/irazza/tsdistances_gpu.git#8b1a56b87e135ad9d8a0844e51eca342286d74f7"
 dependencies = [
  "bytemuck",
  "dashmap",

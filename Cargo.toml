@@ -10,8 +10,11 @@ crate-type = ["dylib", "rlib"]
 name = "benchmark"
 harness = false
 
+# Pin rust-gpu to a specific commit: spirv-builder/spirv-std are tied to an exact
+# rustc nightly (rust-toolchain.toml), so a floating branch would silently break
+# builds when rust-gpu advances past the pinned toolchain.
 [build-dependencies]
-spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu.git", default-features = false }
+spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false }
 
 [dev-dependencies]
 csv = "1.3.1"
@@ -41,7 +44,7 @@ dashmap = "6.1.0"
 rspirv = "0.12.0"
 
 [target.'cfg(target_arch = "spirv")'.dependencies]
-spirv-std = {  git = "https://github.com/Rust-GPU/rust-gpu.git", default-features = false }
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false }
 
 [features]
 default = ["use-compiled-tools"]

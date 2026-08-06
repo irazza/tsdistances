@@ -185,12 +185,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macOS ships Apple Silicon (aarch64) only: GitHub's Intel macos-13
+          # runners are scarce/retiring and chronically stall the queue.
           - { runner: macos-latest, target: aarch64, python-version: "3.12" }
           - { runner: macos-latest, target: aarch64, python-version: "3.13" }
           - { runner: macos-latest, target: aarch64, python-version: "3.14" }
-          - { runner: macos-13, target: x86_64, python-version: "3.12" }
-          - { runner: macos-13, target: x86_64, python-version: "3.13" }
-          - { runner: macos-13, target: x86_64, python-version: "3.14" }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v5

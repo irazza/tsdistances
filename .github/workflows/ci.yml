@@ -131,7 +131,12 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist -i python${{ matrix.python-version }}
+          # aarch64 is CPU-only: vulkano's X11/xcb deps aren't available in the
+          # aarch64 cross sysroot (`cannot find -lxcb`). GPU wheels ship for the
+          # native x86_64-linux and macOS legs.
+          args: >-
+            --release --out dist -i python${{ matrix.python-version }}
+            ${{ matrix.target == 'aarch64' && '--no-default-features --features python,pyo3/extension-module' || '' }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           rustup-components: "rust-src rustc-dev llvm-tools"
           manylinux: auto

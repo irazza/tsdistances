@@ -1121,10 +1121,10 @@ mod tests {
             catch_euclidean(x.clone(), None, false).unwrap(),
             sbd(x, None, false).unwrap(),
         ] {
-            for i in 0..matrix.len() {
-                assert_close(matrix[i][i], 0.0);
-                for j in 0..matrix.len() {
-                    assert_close(matrix[i][j], matrix[j][i]);
+            for (i, row) in matrix.iter().enumerate() {
+                assert_close(row[i], 0.0);
+                for (j, &value) in row.iter().enumerate() {
+                    assert_close(value, matrix[j][i]);
                 }
             }
         }

@@ -599,6 +599,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.33.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7360bd2cd76e0cd9032d42cf2922155cecea2685b0cfa4630c3246df030bcfd6"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1688,6 +1697,7 @@ version = "0.10.0-alpha.1"
 source = "git+https://github.com/Rust-GPU/rust-gpu.git?rev=9453497884c28bd52405f0abc9bfc7d0b3374666#9453497884c28bd52405f0abc9bfc7d0b3374666"
 dependencies = [
  "bitflags",
+ "glam",
  "libm",
  "num-traits",
  "spirv-std-macros",

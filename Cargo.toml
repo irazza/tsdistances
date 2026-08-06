@@ -44,7 +44,8 @@ dashmap = "6.1.0"
 rspirv = "0.12.0"
 
 [target.'cfg(target_arch = "spirv")'.dependencies]
-spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false }
+# spirv-std 0.10 requires selecting a glam version via a `glam_*` feature.
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false, features = ["glam_0_33"] }
 
 [features]
 default = ["use-compiled-tools"]

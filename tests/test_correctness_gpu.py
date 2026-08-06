@@ -13,6 +13,12 @@ from tsdistances import (
 )
 import time
 
+# These tests require a Vulkan-capable GPU (device='gpu') and are excluded from
+# default runs via the `gpu` marker; run them explicitly with
+# `pytest -m gpu tests/test_correctness_gpu.py`. The GPU path computes in f32, so
+# the comparisons against the f64 CPU path use a loose rtol=0.1 by design.
+pytestmark = pytest.mark.gpu
+
 N_SAMPLES = 10
 A = np.loadtxt("tests/ACSF1/ACSF1_TRAIN.tsv", delimiter="\t")[:N_SAMPLES, 1:]
 B = np.loadtxt("tests/ACSF1/ACSF1_TEST.tsv", delimiter="\t")[-N_SAMPLES:, 1:]
@@ -75,7 +81,7 @@ def test_adtw_distance():
 
 def test_msm_distance():
     D = msm_distance(A, B, band=band, par=True)
-    D_gpu = msm_distance(A, B, band=band, par=True, device='gpu')
+    D_gpu = msm_distance(A, B, band=band, device='gpu')
     # Check that the GPU and CPU results are close (compare double precision with the single precision of GPU)
     assert np.allclose(D, D_gpu, rtol=0.1)
 
@@ -83,7 +89,7 @@ def test_msm_distance():
 def test_twe_distance():
     stiffness = 0.1
     penalty = 0.1
-    D = twe_distance(A, B, band=band, stifness=stiffness, penalty=penalty, par=True)
-    D_gpu = twe_distance(A, B, band=band, stifness=stiffness, penalty=penalty, device='gpu')
+    D = twe_distance(A, B, band=band, stiffness=stiffness, penalty=penalty, par=True)
+    D_gpu = twe_distance(A, B, band=band, stiffness=stiffness, penalty=penalty, device='gpu')
     # Check that the GPU and CPU results are close (compare double precision with the single precision of GPU)
     assert np.allclose(D, D_gpu, rtol=0.1)

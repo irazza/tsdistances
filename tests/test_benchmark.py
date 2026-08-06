@@ -14,7 +14,12 @@ from aeon.distances import (
     twe_pairwise_distance,
 )
 import time
-import pandas as pd
+
+# This is a performance benchmark (it also exercises device='gpu'), not a
+# correctness test. It is excluded from default runs via the `benchmark` marker;
+# run it explicitly with `pytest -m benchmark tests/test_benchmark.py`.
+pytestmark = pytest.mark.benchmark
+
 TSDISTANCES = [erp_distance, dtw_distance, adtw_distance]
 AEONDISTANCES = [erp_pairwise_distance, dtw_pairwise_distance, adtw_pairwise_distance]
 MODALITIES = ["", "par", "gpu"]
@@ -108,6 +113,8 @@ def test_tsdistances():
             print(f"\t\tParallel: {mean_par:.4f}±{std_par:.4f} (s){gpu_str}")
             print(f"\t\tAEON: {mean_aeon:.4f}±{std_aeon:.4f} (s)")
 
+            # Correctness is asserted in the dedicated correctness suites; here we
+            # only warn so a numeric mismatch never masks the timing results.
             if not np.allclose(D, D_aeon, atol=1e-8):
                 print("\t\tWARNING: AEON and tsdistances results do not match")
 

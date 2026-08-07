@@ -9,10 +9,13 @@ readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy>=1.21.0,<2.3.0",
+    "numpy>=1.26.0",
     "typeguard",
 ]
 dynamic = ["authors", "description", "version"]
@@ -20,8 +23,10 @@ dynamic = ["authors", "description", "version"]
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-cov",
     "aeon",
     "stumpy",
+    "pycatch22",
     "pandas",
 ]
 
@@ -33,3 +38,22 @@ strip = true
 [project.urls]
 Homepage = "https://github.com/irazza/tsdistances"
 Issues = "https://github.com/irazza/tsdistances/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not gpu and not benchmark'"
+markers = [
+    "gpu: tests that require a Vulkan-capable GPU (excluded from default runs)",
+    "benchmark: performance benchmarks, not correctness tests (excluded from default runs)",
+]
+
+[tool.coverage.run]
+source = ["tsdistances"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

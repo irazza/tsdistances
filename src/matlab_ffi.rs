@@ -40,8 +40,8 @@ impl DistanceResult {
         // Flatten the 2D vector to 1D (column-major for MATLAB)
         let mut flat_data: Vec<f64> = Vec::with_capacity(rows * cols);
         for col in 0..cols {
-            for row in 0..rows {
-                flat_data.push(data[row][col]);
+            for data_row in &data {
+                flat_data.push(data_row[col]);
             }
         }
 
@@ -146,7 +146,9 @@ unsafe fn ragged_input_to_vecs(input: *const RaggedInput) -> Result<Option<Vec<V
     }
 
     let lengths = unsafe { slice::from_raw_parts(input.lengths, input.rows) };
-    let expected_total = lengths.iter().try_fold(0usize, |acc, len| acc.checked_add(*len));
+    let expected_total = lengths
+        .iter()
+        .try_fold(0usize, |acc, len| acc.checked_add(*len));
     let expected_total = match expected_total {
         Some(v) => v,
         None => return Err(3),
@@ -180,7 +182,10 @@ unsafe fn ragged_input_to_vecs(input: *const RaggedInput) -> Result<Option<Vec<V
 }
 
 fn validate_equal_lengths(x1: &[Vec<f64>], x2: Option<&[Vec<f64>]>) -> bool {
-    let first_len = x1.first().map(|v| v.len()).or_else(|| x2.and_then(|v| v.first().map(|s| s.len())));
+    let first_len = x1
+        .first()
+        .map(|v| v.len())
+        .or_else(|| x2.and_then(|v| v.first().map(|s| s.len())));
 
     let Some(first_len) = first_len else {
         return true;
@@ -190,10 +195,10 @@ fn validate_equal_lengths(x1: &[Vec<f64>], x2: Option<&[Vec<f64>]>) -> bool {
         return false;
     }
 
-    if let Some(x2) = x2 {
-        if x2.iter().any(|series| series.len() != first_len) {
-            return false;
-        }
+    if let Some(x2) = x2
+        && x2.iter().any(|series| series.len() != first_len)
+    {
+        return false;
     }
 
     true

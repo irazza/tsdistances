@@ -59,8 +59,8 @@ def euclidean_distance(
     u : (N,) array_like or (M, N) array_like
         Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N) array_like, optional
-    Input array. If provided, `v` should have the same shape as `u`.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array. If provided, `v` should have the same shape as `u`.
+        If `v` is None, pairwise distances within `u` are computed.
     par : bool, optional
         Enable parallel computation (default is True).
 
@@ -84,12 +84,10 @@ def euclidean_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.euclidean(_u_backend, _v_backend, par)[0][0]
-        return np.array(tsd.euclidean(_u_backend, _v_backend, par))
     if _v is None:
         return np.array(tsd.euclidean(_u_backend, None, par))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.euclidean(_u_backend, _v_backend, par)[0][0]
     return np.array(tsd.euclidean(_u_backend, _v_backend, par))
 
 
@@ -106,8 +104,8 @@ def catcheucl_distance(
     u : (N,) array_like or (M, N) array_like
         Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N) array_like, optional
-    Input array. If provided, `v` should have the same shape as `u`.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array. If provided, `v` should have the same shape as `u`.
+        If `v` is None, pairwise distances within `u` are computed.
     par : bool, optional
         Enable parallel computation (default is True).
 
@@ -118,23 +116,20 @@ def catcheucl_distance(
 
     Examples
     --------
-    >>> catcheucl_distance([1, 0, 0], [0, 1, 0])
-    1.0
-    >>> catcheucl_distance([[1, 1, 1], [0, 1, 1]], [[0, 1, 0], [-1, 0, 0]])
-    array([[1.0, 2.0], [1.0, 1.0]])
-    >>> catcheucl_distance([[1, 1, 1], [0, 1, 1]])
-    array([[0.0, 1.0], [1.0, 0.0]])
+    >>> catcheucl_distance([[1, 1, 1, 1], [0, 1, 1, 0]], [[0, 1, 0, 1], [-1, 0, 0, 1]])
+    array([[...]])
+    >>> catcheucl_distance([[1, 1, 1, 1], [0, 1, 1, 0]])
+    array([[0., 1.],
+           [1., 0.]])
 
     """
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.catch_euclidean(_u_backend, _v_backend, par)[0][0]
-        return np.array(tsd.catch_euclidean(_u_backend, _v_backend, par))
     if _v is None:
         return np.array(tsd.catch_euclidean(_u_backend, None, par))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.catch_euclidean(_u_backend, _v_backend, par)[0][0]
     return np.array(tsd.catch_euclidean(_u_backend, _v_backend, par))
 
 
@@ -157,16 +152,18 @@ def erp_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
     gap_penalty : double, optional
-    Penalty for gap insertion/deletion (default is 0.0).
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Penalty for gap insertion/deletion (default is 0.0).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
@@ -185,19 +182,11 @@ def erp_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
+    if _v is None:
+        return np.array(tsd.erp(_u_backend, None, band, gap_penalty, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device)[0][0]
+    return np.array(tsd.erp(_u_backend, _v_backend, band, gap_penalty, par, device))
 
 
 @typechecked
@@ -219,15 +208,18 @@ def lcss_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
     epsilon : double, optional
-    Threshold value for the distance between two elements (default is 1.0).
-    par : int, optional
+        Threshold value for the distance between two elements (default is 1.0).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
@@ -246,19 +238,11 @@ def lcss_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
+    if _v is None:
+        return np.array(tsd.lcss(_u_backend, None, band, epsilon, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device)[0][0]
+    return np.array(tsd.lcss(_u_backend, _v_backend, band, epsilon, par, device))
 
 
 @typechecked
@@ -279,19 +263,21 @@ def dtw_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
     distance : double or ndarray
-    The DTW distance(s) between vectors/sets `u` and `v`.
+        The DTW distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -305,19 +291,11 @@ def dtw_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.dtw(_u_backend, _v_backend, band, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
+    if _v is None:
+        return np.array(tsd.dtw(_u_backend, None, band, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.dtw(_u_backend, _v_backend, band, par, device)[0][0]
+    return np.array(tsd.dtw(_u_backend, _v_backend, band, par, device))
 
 
 @typechecked
@@ -338,19 +316,21 @@ def ddtw_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
     distance : double or ndarray
-    The DDTW distance(s) between vectors/sets `u` and `v`.
+        The DDTW distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -366,19 +346,11 @@ def ddtw_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.ddtw(_u_backend, _v_backend, band, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
+    if _v is None:
+        return np.array(tsd.ddtw(_u_backend, None, band, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.ddtw(_u_backend, _v_backend, band, par, device)[0][0]
+    return np.array(tsd.ddtw(_u_backend, _v_backend, band, par, device))
 
 
 @typechecked
@@ -400,19 +372,23 @@ def wdtw_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+    g : double, optional
+        Controls the strength of the logistic weight applied to warping (default is 0.05).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
     distance : double or ndarray
-    The WDTW distance(s) between vectors/sets `u` and `v`.
+        The WDTW distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -428,19 +404,11 @@ def wdtw_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.wdtw(_u_backend, _v_backend, band, g, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
+    if _v is None:
+        return np.array(tsd.wdtw(_u_backend, None, band, g, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.wdtw(_u_backend, _v_backend, band, g, par, device)[0][0]
+    return np.array(tsd.wdtw(_u_backend, _v_backend, band, g, par, device))
 
 
 @typechecked
@@ -462,18 +430,23 @@ def wddtw_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
-    par : int, optional
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+    g : double, optional
+        Controls the strength of the logistic weight applied to warping (default is 0.05).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
     distance : double or ndarray
-    The WDDTW distance(s) between vectors/sets `u` and `v`.
+        The WDDTW distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -489,19 +462,11 @@ def wddtw_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.wddtw(_u_backend, _v_backend, band, g, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
+    if _v is None:
+        return np.array(tsd.wddtw(_u_backend, None, band, g, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.wddtw(_u_backend, _v_backend, band, g, par, device)[0][0]
+    return np.array(tsd.wddtw(_u_backend, _v_backend, band, g, par, device))
 
 
 @typechecked
@@ -523,21 +488,23 @@ def adtw_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
-    w : double, optional
-    Weight amercing penalty (default is 0.1).
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+    warp_penalty : double, optional
+        Additive penalty applied to each warping step (default is 1.0).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
     distance : double or ndarray
-    The ADTW distance(s) between vectors/sets `u` and `v`.
+        The ADTW distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -553,19 +520,11 @@ def adtw_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
+    if _v is None:
+        return np.array(tsd.adtw(_u_backend, None, band, warp_penalty, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device)[0][0]
+    return np.array(tsd.adtw(_u_backend, _v_backend, band, warp_penalty, par, device))
 
 
 @typechecked
@@ -586,19 +545,21 @@ def msm_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
     distance : double or ndarray
-    The MSM distance(s) between vectors/sets `u` and `v`.
+        The MSM distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -612,19 +573,11 @@ def msm_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.msm(_u_backend, _v_backend, band, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
+    if _v is None:
+        return np.array(tsd.msm(_u_backend, None, band, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.msm(_u_backend, _v_backend, band, par, device)[0][0]
+    return np.array(tsd.msm(_u_backend, _v_backend, band, par, device))
 
 
 @typechecked
@@ -632,7 +585,7 @@ def twe_distance(
     u: ArrayLike,
     v: Optional[ArrayLike] = None,
     band: Optional[float] = 1.0,
-    stifness: Optional[float] = 0.001,
+    stiffness: Optional[float] = 0.001,
     penalty: Optional[float] = 1.0,
     par: Optional[bool] = True,
     device: Optional[str] = "cpu",
@@ -647,23 +600,25 @@ def twe_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
     band : double, optional
-    Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
-    stifness : double, optional
-    Elasticity parameter (default is 0.001).
+        Band size for the Sakoe-Chiba dynamic programming algorithm (default is 1.0).
+    stiffness : double, optional
+        Elasticity parameter, also referred to as nu (default is 0.001).
     penalty : double, optional
-    Penalty for gap insertion/deletion (default is 1.0).
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Penalty for gap insertion/deletion, also referred to as lambda (default is 1.0).
+    par : bool, optional
+        Enable parallel computation (default is True).
+    device : str, optional
+        Device to run the computation on, either 'cpu' or 'gpu' (default is 'cpu').
 
     Returns
     -------
     distance : double or ndarray
-    The TWE distance(s) between vectors/sets `u` and `v`.
+        The TWE distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -677,19 +632,11 @@ def twe_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.twe(_u_backend, _v_backend, band, stifness, penalty, par, device))
+    if _v is None:
+        return np.array(tsd.twe(_u_backend, None, band, stiffness, penalty, par, device))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.twe(_u_backend, _v_backend, band, stiffness, penalty, par, device)[0][0]
+    return np.array(tsd.twe(_u_backend, _v_backend, band, stiffness, penalty, par, device))
 
 
 @typechecked
@@ -708,17 +655,17 @@ def sb_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
+    par : bool, optional
+        Enable parallel computation (default is True).
 
     Returns
     -------
     distance : double or ndarray
-    The SBD distance(s) between vectors/sets `u` and `v`.
+        The SBD distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
@@ -732,27 +679,20 @@ def sb_distance(
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.sb(_u_backend, _v_backend, par)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.sb(_u_backend, _v_backend, par))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.sb(_u_backend, _v_backend, par))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.sb(_u_backend, _v_backend, par))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.sb(_u_backend, _v_backend, par))
+    if _v is None:
+        return np.array(tsd.sb(_u_backend, None, par))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.sb(_u_backend, _v_backend, par)[0][0]
+    return np.array(tsd.sb(_u_backend, _v_backend, par))
 
 
+@typechecked
 def mp_distance(
     u: ArrayLike,
     window: Optional[int] = 20,
     v: Optional[ArrayLike] = None,
     par: Optional[bool] = True,
-):
+) -> Union[np.ndarray, float]:
     """
     Computes the Matrix Profile distance (MPdist) [1] between two 1-D arrays or between two sets of 1-D arrays.
     If `v` is None, the function computes the pairwise MP distances within `u`.
@@ -763,48 +703,37 @@ def mp_distance(
     Parameters
     ----------
     u : (N,) array_like or (M, N)
-    Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
-
-    v : (N,) array_like or (M, N), optional
-    Input array.
-    If `v` is None, pairwise distances within `u` are computed.
-
+        Input array. If 1-D, `u` represents a single vector. If 2-D, `u` represents a set of vectors.
     window : int, optional
-    Window size for the Matrix Profile calculation (default is 1).
-
-    par : int, optional
-    Number of jobs to use for computation (default is 1).
+        Window size for the Matrix Profile calculation (default is 20).
+    v : (N,) array_like or (M, N), optional
+        Input array.
+        If `v` is None, pairwise distances within `u` are computed.
+    par : bool, optional
+        Enable parallel computation (default is True).
 
     Returns
     -------
     distance : double or ndarray
-    The MP distance(s) between vectors/sets `u` and `v`.
+        The MP distance(s) between vectors/sets `u` and `v`.
 
     Examples
     --------
-    >>> mp_distance([1, 0, 0], [0, 1, 0])
+    >>> mp_distance([1, 0, 0], [0, 1, 0], window=2)
     1.4142135623730951
-    >>> mp_distance([[1, 1, 1], [0, 1, 1]], [[0, 1, 0], [-1, 0, 0]])
+    >>> mp_distance([[1, 1, 1], [0, 1, 1]], window=2, v=[[0, 1, 0], [-1, 0, 0]])
     array([[1.41421356, 2.44948974], [1.        , 1.73205081]])
-    >>> mp_distance([[1, 1, 1], [0, 1, 1]])
-    p array([[0.        , 1.        ], [1.        , 0.        ]])
+    >>> mp_distance([[1, 1, 1], [0, 1, 1]], window=2)
+    array([[0.        , 1.        ], [1.        , 0.        ]])
     """
     _u, _v = check_input(u, v)
     _u_backend, _v_backend = _to_backend_inputs(_u, _v)
 
-    if _u.shape[0] == 1:
-        if _v.shape[0] == 1:
-            return tsd.mp(_u_backend, window, _v_backend, par)[0][0]
-        elif v.shape[0] >= 2:
-            return np.array(tsd.mp(_u_backend, window, _v_backend, par))
-    elif _u.shape[0] >= 2:
-        if _v is None:
-            return np.array(tsd.mp(_u_backend, window, _v_backend, par))
-        else:
-            if _v.shape[0] == 1:
-                return np.array(tsd.mp(_u_backend, window, _v_backend, par))
-            elif _v.shape[0] >= 2:
-                return np.array(tsd.mp(_u_backend, window, _v_backend, par))
+    if _v is None:
+        return np.array(tsd.mp(_u_backend, window, None, par))
+    if _u.shape[0] == 1 and _v.shape[0] == 1:
+        return tsd.mp(_u_backend, window, _v_backend, par)[0][0]
+    return np.array(tsd.mp(_u_backend, window, _v_backend, par))
 
 
 __all__ = [

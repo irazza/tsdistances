@@ -139,8 +139,8 @@ def test_band_out_of_range(dist, band):
     [
         (erp_distance, {"gap_penalty": -0.1}, "Gap penalty"),
         (lcss_distance, {"epsilon": -0.1}, "Epsilon"),
-        (adtw_distance, {"warp_penalty": -0.1}, "Weight must be non-negative"),
-        (twe_distance, {"stifness": -0.1}, "Stiffness"),
+        (adtw_distance, {"warp_penalty": -0.1}, "Warp penalty"),
+        (twe_distance, {"stiffness": -0.1}, "Stiffness"),
         (twe_distance, {"penalty": -0.1}, "Penalty"),
     ],
 )
@@ -186,7 +186,7 @@ def test_shape_handling_mixed_dims(dist):
         (wdtw_distance, {"band": 1.0, "g": 0.0}),
         (wddtw_distance, {"band": 0.5, "g": 0.1}),
         (adtw_distance, {"band": 1.0, "warp_penalty": 0.0}),
-        (twe_distance, {"band": 1.0, "stifness": 0.0, "penalty": 0.0}),
+        (twe_distance, {"band": 1.0, "stiffness": 0.0, "penalty": 0.0}),
     ],
 )
 def test_parameter_edge_values(dist, kwargs):

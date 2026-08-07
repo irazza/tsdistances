@@ -75,9 +75,12 @@ pub fn cross_correlation(a: &[f64], b: &[f64]) -> Vec<f64> {
     })
 }
 
+/// A forward/inverse FFT plan pair for a given length.
+type FftPlanPair = (Arc<dyn Fft<f64>>, Arc<dyn Fft<f64>>);
+
 struct FftCache {
     planner: FftPlanner<f64>,
-    plans: HashMap<usize, (Arc<dyn Fft<f64>>, Arc<dyn Fft<f64>>)>,
+    plans: HashMap<usize, FftPlanPair>,
     a_fft: Vec<Complex<f64>>,
     b_fft: Vec<Complex<f64>>,
     c_fft: Vec<Complex<f64>>,
@@ -96,7 +99,7 @@ impl FftCache {
         }
     }
 
-    fn get_plans(&mut self, len: usize) -> (Arc<dyn Fft<f64>>, Arc<dyn Fft<f64>>) {
+    fn get_plans(&mut self, len: usize) -> FftPlanPair {
         if let Some((fft, ifft)) = self.plans.get(&len) {
             return (fft.clone(), ifft.clone());
         }

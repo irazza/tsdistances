@@ -48,13 +48,8 @@ impl Matrix for FullMatrix {
         let mut col: isize = 0;
 
         for (row_idx, matrix_row) in matrix.iter_mut().enumerate() {
-            let mut row1 = row;
-            let mut col1 = col;
-
-            for cell in matrix_row.iter_mut() {
-                *cell = self.get_diagonal_cell(row1, col1);
-                row1 += 1;
-                col1 += 1;
+            for (offset, cell) in matrix_row.iter_mut().enumerate() {
+                *cell = self.get_diagonal_cell(row + offset, col + offset as isize);
                 print!("{cell:.1}, ");
             }
             println!();

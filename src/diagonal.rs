@@ -139,8 +139,6 @@ fn diagonal_distance_<M: Matrix>(
         // Post init for sakoe chiba band skipped cells
         for k in (s_step..(e + 1)).step_by(2) {
             matrix.set_diagonal_cell(d, k, init_val);
-            i1 = i1.wrapping_sub(1);
-            j1 += 1;
         }
 
         if d <= a_len {

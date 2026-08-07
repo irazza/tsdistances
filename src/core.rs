@@ -32,6 +32,10 @@ impl std::error::Error for DistanceError {}
 
 pub type Result<T> = std::result::Result<T, DistanceError>;
 
+// Only the non-GPU build routes "gpu" requests through this helper; with the
+// `gpu` feature enabled the call sites below are compiled out, so gate the
+// function to match and avoid a dead-code error under `-D warnings`.
+#[cfg(not(feature = "gpu"))]
 fn gpu_feature_error() -> DistanceError {
     DistanceError::InvalidParameter("GPU support is not enabled in this build".to_string())
 }
@@ -149,6 +153,23 @@ pub fn euclidean(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Res
     Ok(distance_matrix)
 }
 
+/// Extract the catch22/catch24 feature vector for a single series.
+///
+/// Uses the catch22 crate's standard normalized pipeline (features 0..21 on the
+/// z-scored series, plus raw mean/std/slope), matching the reference C
+/// implementation and `pycatch22`. Any input the crate rejects (series shorter
+/// than the minimum length, non-finite or constant series) yields an all-zero
+/// feature vector, and any individual non-finite feature is replaced with 0.0.
+/// Both `x1` and `x2` go through this same path, so identical series always map
+/// to identical features regardless of which argument they came from.
+fn catch22_features(x: &[f64]) -> Vec<f64> {
+    let features = catch22::compute_all_normalized(x).unwrap_or([0.0; catch22::N_CATCH22]);
+    features
+        .iter()
+        .map(|&value| if value.is_finite() { value } else { 0.0 })
+        .collect()
+}
+
 /// Compute Catch22-Euclidean distance matrix
 pub fn catch_euclidean(
     x1: Vec<Vec<f64>>,
@@ -157,35 +178,13 @@ pub fn catch_euclidean(
 ) -> Result<Vec<Vec<f64>>> {
     let x1 = x1
         .iter()
-        .map(|x| {
-            let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
-            for i in 0..catch22::N_CATCH22 {
-                let value = catch22::compute(x, i);
-                if value.is_nan() {
-                    transformed_x.push(0.0);
-                } else {
-                    transformed_x.push(value);
-                }
-            }
-            transformed_x
-        })
-        .collect::<Vec<Vec<_>>>();
+        .map(|x| catch22_features(x))
+        .collect::<Vec<Vec<f64>>>();
 
     let x2 = x2.map(|x2| {
         x2.iter()
-            .map(|x| {
-                let mut transformed_x = Vec::with_capacity(catch22::N_CATCH22);
-                for i in 0..catch22::N_CATCH22 {
-                    let value = catch22::compute(x, i);
-                    if value.is_finite() {
-                        transformed_x.push(value);
-                    } else {
-                        transformed_x.push(0.0);
-                    }
-                }
-                transformed_x
-            })
-            .collect::<Vec<Vec<_>>>()
+            .map(|x| catch22_features(x))
+            .collect::<Vec<Vec<f64>>>()
     });
 
     // Z-Normalize on the column-wise
@@ -376,7 +375,10 @@ pub fn lcss(
                             (dist <= epsilon) as i32 as f64 * (y + 1.0)
                                 + (dist > epsilon) as i32 as f64 * max(x, z)
                         };
-                    let max_len = max(a.len(), b.len()) as f64;
+                    // Normalize by the shorter series length to match aeon
+                    // (`1 - lcss / min(x_size, y_size)`). For equal-length
+                    // inputs this is identical to normalizing by the max.
+                    let norm_len = min(a.len(), b.len()) as f64;
                     let similarity = diagonal::diagonal_distance::<WavefrontMatrix>(
                         a,
                         b,
@@ -386,7 +388,7 @@ pub fn lcss(
                         lcss_cost_func,
                         false,
                     );
-                    1.0 - similarity / max_len
+                    1.0 - similarity / norm_len
                 },
                 x1,
                 x2,
@@ -513,14 +515,23 @@ pub fn wdtw(
 
     match device {
         "cpu" => {
+            // Compute the weight profile once, over the longest series across
+            // both sets. This matches the Python bindings' historical numeric
+            // behavior (a single global weight vector) and avoids recomputing
+            // the weights for every pair. For equal-length inputs (all current
+            // tests and the MATLAB FFI) this is identical to the per-pair form.
+            let mut max_len = x1.iter().map(|v| v.len()).max().unwrap_or(0);
+            if let Some(x2) = &x2 {
+                max_len = max_len.max(x2.iter().map(|v| v.len()).max().unwrap_or(0));
+            }
+            let weights = dtw_weights(max_len, g);
             let distance_matrix = compute_distance(
                 |a, b| {
-                    let weights = dtw_weights(a.len().max(b.len()), g);
-
                     let wdtw_cost_func =
                         |a: &[f64], b: &[f64], i: usize, j: usize, x: f64, y: f64, z: f64| {
                             let diff = a[i] - b[j];
-                            let dist = diff * diff
+                            let dist = diff
+                                * diff
                                 * weights[(i as i32 - j as i32).unsigned_abs() as usize];
                             dist + min(min(z, x), y)
                         };
@@ -900,9 +911,14 @@ pub fn mp(
             let n_a = a.len();
             let n_b = b.len();
             let mut p_abba = mp_inner(a, b, window);
+            // `mp_inner` clamps the window to the shorter series, so the joint
+            // matrix profile has `(n_a - w + 1) + (n_b - w + 1)` entries. Use the
+            // same clamped window here to pick the selection index; otherwise a
+            // window larger than a series underflows the usize subtraction.
+            let w = window.min(n_a).min(n_b);
             let n = min(
                 (threshold * (n_a + n_b) as f64).ceil() as usize,
-                n_a - window + 1 + n_b - window + 1 - 1,
+                (n_a - w + 1) + (n_b - w + 1) - 1,
             );
             *p_abba
                 .select_nth_unstable_by(n, |x, y| x.partial_cmp(y).unwrap())
@@ -982,10 +998,7 @@ mod tests {
 
     fn assert_close(left: f64, right: f64) {
         let diff = (left - right).abs();
-        assert!(
-            diff < 1e-8,
-            "left={left}, right={right}, abs_diff={diff}"
-        );
+        assert!(diff < 1e-8, "left={left}, right={right}, abs_diff={diff}");
     }
 
     fn assert_matrix_close(left: &[Vec<f64>], right: &[Vec<f64>]) {
@@ -1027,24 +1040,42 @@ mod tests {
         let a = vec![vec![1.0, 0.0, 0.0]];
         let b = vec![vec![0.0, 1.0, 0.0]];
 
-        assert_close(erp(a.clone(), Some(b.clone()), 1.0, 0.0, false, "cpu").unwrap()[0][0], 2.0);
-        assert_close(lcss(a.clone(), Some(b.clone()), 1.0, 0.5, false, "cpu").unwrap()[0][0], 1.0 / 3.0);
-        assert_close(dtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0], 1.0);
+        assert_close(
+            erp(a.clone(), Some(b.clone()), 1.0, 0.0, false, "cpu").unwrap()[0][0],
+            2.0,
+        );
+        assert_close(
+            lcss(a.clone(), Some(b.clone()), 1.0, 0.5, false, "cpu").unwrap()[0][0],
+            1.0 / 3.0,
+        );
+        assert_close(
+            dtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0],
+            1.0,
+        );
         let a_d = derivate(&a);
         let b_d = derivate(&b);
         assert_matrix_close(
             &ddtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap(),
             &dtw(a_d.clone(), Some(b_d.clone()), 1.0, false, "cpu").unwrap(),
         );
-        assert_close(wdtw(a.clone(), Some(a.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0], 0.0);
+        assert_close(
+            wdtw(a.clone(), Some(a.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0],
+            0.0,
+        );
         assert!(wdtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0] >= 0.0);
         assert_matrix_close(
             &wddtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap(),
             &wdtw(a_d, Some(b_d), 1.0, 0.05, false, "cpu").unwrap(),
         );
-        assert_close(adtw(a.clone(), Some(a.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0], 0.0);
+        assert_close(
+            adtw(a.clone(), Some(a.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0],
+            0.0,
+        );
         assert!(adtw(a.clone(), Some(b.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0] >= 0.0);
-        assert_close(msm(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0], 2.0);
+        assert_close(
+            msm(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0],
+            2.0,
+        );
         assert_close(
             twe(a.clone(), Some(b), 1.0, 0.001, 1.0, false, "cpu").unwrap()[0][0],
             4.0,
@@ -1058,10 +1089,7 @@ mod tests {
             vec![1.0, 2.0, 1.0, 0.0],
             vec![3.0, 1.0, 0.0, 1.0],
         ];
-        let y = vec![
-            vec![0.0, 0.5, 1.5, 3.0],
-            vec![2.0, 1.0, 0.5, 0.0],
-        ];
+        let y = vec![vec![0.0, 0.5, 1.5, 3.0], vec![2.0, 1.0, 0.5, 0.0]];
 
         assert_matrix_close(
             &euclidean(x.clone(), Some(y.clone()), false).unwrap(),
@@ -1093,10 +1121,10 @@ mod tests {
             catch_euclidean(x.clone(), None, false).unwrap(),
             sbd(x, None, false).unwrap(),
         ] {
-            for i in 0..matrix.len() {
-                assert_close(matrix[i][i], 0.0);
-                for j in 0..matrix.len() {
-                    assert_close(matrix[i][j], matrix[j][i]);
+            for (i, row) in matrix.iter().enumerate() {
+                assert_close(row[i], 0.0);
+                for (j, &value) in row.iter().enumerate() {
+                    assert_close(value, matrix[j][i]);
                 }
             }
         }
@@ -1140,18 +1168,33 @@ mod tests {
     #[test]
     fn mean_std_per_windows_matches_manual_values() {
         let (means, stds) = mean_std_per_windows(&[1.0, 3.0, 5.0, 7.0], 2);
-        assert_matrix_close(
-            &[means, stds],
-            &[
-                vec![2.0, 4.0, 6.0],
-                vec![1.0, 1.0, 1.0],
-            ],
-        );
+        assert_matrix_close(&[means, stds], &[vec![2.0, 4.0, 6.0], vec![1.0, 1.0, 1.0]]);
     }
 
     #[test]
     fn mp_inner_returns_zero_for_identical_series() {
         let values = mp_inner(&[1.0, 2.0, 3.0, 4.0], &[1.0, 2.0, 3.0, 4.0], 2);
         assert!(values.iter().all(|v| v.abs() < 1e-8));
+    }
+
+    #[test]
+    fn lcss_normalizes_by_shorter_series() {
+        // The shorter series is an exact prefix of the longer one, so the LCSS
+        // equals the shorter length. Normalizing by the shorter length (as aeon
+        // does) yields distance 0; the old max-length normalization would not.
+        let a = vec![vec![0.0, 1.0, 2.0]];
+        let b = vec![vec![0.0, 1.0, 2.0, 9.0, 9.0]];
+        let d = lcss(a, Some(b), 1.0, 0.5, false, "cpu").unwrap();
+        assert_close(d[0][0], 0.0);
+    }
+
+    #[test]
+    fn mp_handles_window_larger_than_series() {
+        // A window larger than the series must clamp rather than underflow the
+        // usize subtraction when picking the selection index.
+        let x = vec![vec![1.0, 2.0, 3.0]];
+        let y = vec![vec![3.0, 2.0, 1.0]];
+        let d = mp(x, Some(y), 20, false).unwrap();
+        assert!(d[0][0].is_finite());
     }
 }

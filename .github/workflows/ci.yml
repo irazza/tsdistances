@@ -11,6 +11,13 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+concurrency:
+  # Auto-cancel superseded runs for the same branch/PR so transient-outage
+  # re-triggers don't pile up as stale "queued" runs. Never cancel tag/release
+  # runs (those must complete to publish artifacts).
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   checks: write
@@ -19,43 +26,106 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  RUST_TOOLCHAIN: nightly-2026-05-22
 
 jobs:
-  lint:
-    name: Lint & Format
+  # --- Rust checks, split so a formatting nit can no longer gate the whole
+  # --- build/test matrix (which is what silently disabled the aeon suite).
+  fmt:
+    name: Rustfmt
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Install Rust toolchain
+        run: |
+          rustup install ${{ env.RUST_TOOLCHAIN }}
+          rustup component add rustfmt --toolchain ${{ env.RUST_TOOLCHAIN }}
+          rustup default ${{ env.RUST_TOOLCHAIN }}
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev libxrandr-dev pkg-config
-      - name: Install Rust toolchain with components
+      - name: Install Rust toolchain
         run: |
-          rustup install nightly-2025-06-30
-          rustup component add rustfmt clippy --toolchain nightly-2025-06-30
-          rustup default nightly-2025-06-30
+          rustup install ${{ env.RUST_TOOLCHAIN }}
+          rustup component add clippy --toolchain ${{ env.RUST_TOOLCHAIN }}
+          rustup default ${{ env.RUST_TOOLCHAIN }}
       - uses: Swatinem/rust-cache@v2
-      - name: Check formatting
-        run: cargo fmt -- --check
-      - name: Clippy lints
+      - name: Clippy (python + gpu bindings)
         run: cargo clippy --all-targets --features python,use-compiled-tools -- -D warnings
-      - name: Run tests (lib)
-        run: cargo test --lib --no-default-features --features python,use-compiled-tools
+      - name: Clippy (matlab bindings)
+        run: cargo clippy --lib --no-default-features --features matlab -- -D warnings
+
+  rust-test:
+    name: Rust unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxrandr-dev pkg-config
+      - name: Install Rust toolchain
+        run: |
+          rustup install ${{ env.RUST_TOOLCHAIN }}
+          rustup default ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      # The unit tests live in the binding-agnostic `core` module and are the
+      # primary regression gate; they need neither the python nor the gpu build.
+      - name: Run core unit tests
+        run: cargo test --lib --no-default-features
+
+  rust-coverage:
+    name: Rust coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxrandr-dev pkg-config
+      - name: Install Rust toolchain
+        run: |
+          rustup install ${{ env.RUST_TOOLCHAIN }}
+          rustup component add llvm-tools --toolchain ${{ env.RUST_TOOLCHAIN }}
+          rustup default ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate lcov coverage
+        run: cargo llvm-cov --lib --no-default-features --lcov --output-path lcov.info
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          flags: rust
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   linux:
-    runs-on: ${{ matrix.platform.runner }}
-    needs: [lint]
+    name: Wheel (linux ${{ matrix.target }}, py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    # No `needs: [lint]`: this job builds its own wheel, so a lint failure must
+    # never be able to hide a correctness regression again.
     timeout-minutes: 60
     strategy:
+      fail-fast: false
       matrix:
-        platform:
-          - runner: ubuntu-latest
-            target: x86_64
-        python-version: ["3.12", "3.13"]
+        target: [x86_64, aarch64]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -67,40 +137,68 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python${{ matrix.python-version }}
+          target: ${{ matrix.target }}
+          # aarch64 is CPU-only: vulkano's X11/xcb deps aren't available in the
+          # aarch64 cross sysroot (`cannot find -lxcb`). GPU wheels ship for the
+          # native x86_64-linux and macOS legs.
+          args: >-
+            --release --out dist -i python${{ matrix.python-version }}
+            ${{ matrix.target == 'aarch64' && '--no-default-features --features python,pyo3/extension-module' || '' }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           rustup-components: "rust-src rustc-dev llvm-tools"
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.platform.runner }}-${{ matrix.platform.target }}-py${{ matrix.python-version }}
+          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python-version }}
           path: dist
-      - name: Prepare test environment
+      # Correctness runs only on the native x86_64 runner; the aarch64 wheel is
+      # cross-built and can't be executed here.
+      - name: Install and test package
+        if: matrix.target == 'x86_64'
+        shell: bash
         run: |
           python -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
-          pip install --quiet pytest aeon stumpy
-      - name: Install and test package
-        run: |
-          source .venv/bin/activate
-          pip install tsdistances --find-links dist --force-reinstall
-          pytest -v --tb=short tests/test_correctness_cpu.py
+          if [[ "${{ matrix.python-version }}" == "3.14" ]]; then
+            # aeon/numba have no 3.14 support yet: build the wheel and smoke-test
+            # the wrappers (no oracle suite).
+            pip install --quiet numpy typeguard pytest
+            pip install tsdistances --no-index --find-links dist --force-reinstall --no-deps
+            pytest -v --tb=short tests/test_edge_cases.py tests/test_python_bindings.py
+          else
+            pip install --quiet numpy typeguard pytest pytest-cov aeon stumpy pycatch22
+            pip install tsdistances --no-index --find-links dist --force-reinstall --no-deps
+            pytest -v --tb=short --require-oracles --cov=tsdistances --cov-report=xml \
+              tests/test_edge_cases.py tests/test_python_bindings.py \
+              tests/test_correctness_cpu.py tests/test_correctness_banded.py \
+              tests/test_correctness_catcheucl.py
+          fi
+      - name: Upload Python coverage
+        if: matrix.target == 'x86_64' && matrix.python-version == '3.13'
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: python
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   macos:
-    runs-on: ${{ matrix.platform.runner }}
-    needs: [lint]
+    name: Wheel (macos ${{ matrix.target }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
+      fail-fast: false
       matrix:
-        platform:
-          - runner: macos-latest
-            target: aarch64
-        python-version: ["3.12", "3.13"]
+        include:
+          # macOS ships Apple Silicon (aarch64) only: GitHub's Intel macos-13
+          # runners are scarce/retiring and chronically stall the queue.
+          - { runner: macos-latest, target: aarch64, python-version: "3.12" }
+          - { runner: macos-latest, target: aarch64, python-version: "3.13" }
+          - { runner: macos-latest, target: aarch64, python-version: "3.14" }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -108,33 +206,75 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
+          target: ${{ matrix.target }}
           args: --release --out dist -i python${{ matrix.python-version }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           rustup-components: "rust-src rustc-dev llvm-tools"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.platform.runner }}-${{ matrix.platform.target }}-py${{ matrix.python-version }}
+          name: wheels-macos-${{ matrix.target }}-py${{ matrix.python-version }}
           path: dist
-      - name: Prepare test environment
+      - name: Install and test package
+        shell: bash
         run: |
           python -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
-          pip install --quiet pytest aeon stumpy
-      - name: Install and test package
+          if [[ "${{ matrix.python-version }}" == "3.14" ]]; then
+            pip install --quiet numpy typeguard pytest
+            pip install tsdistances --no-index --find-links dist --force-reinstall --no-deps
+            pytest -v --tb=short tests/test_edge_cases.py tests/test_python_bindings.py
+          else
+            pip install --quiet numpy typeguard pytest pytest-cov aeon stumpy pycatch22
+            pip install tsdistances --no-index --find-links dist --force-reinstall --no-deps
+            pytest -v --tb=short --require-oracles \
+              tests/test_edge_cases.py tests/test_python_bindings.py \
+              tests/test_correctness_cpu.py tests/test_correctness_banded.py \
+              tests/test_correctness_catcheucl.py
+          fi
+
+  windows:
+    name: Wheel (windows x86_64 CPU-only, py${{ matrix.python-version }})
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: Swatinem/rust-cache@v2
+      # CPU-only: the gpu feature pulls rust-gpu's rustc_codegen_spirv, whose
+      # link step exceeds Windows' 65535-object limit (LNK1189). Windows wheels
+      # therefore ship without GPU support.
+      - name: Build wheels (CPU-only)
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --out dist -i python${{ matrix.python-version }} --no-default-features --features python,pyo3/extension-module
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-x86_64-py${{ matrix.python-version }}
+          path: dist
+      - name: Install and smoke-test package
+        shell: bash
         run: |
-          source .venv/bin/activate
-          pip install tsdistances --find-links dist --force-reinstall
-          pytest -v --tb=short tests/test_correctness_cpu.py
+          python -m pip install --upgrade pip
+          pip install numpy typeguard pytest
+          pip install tsdistances --no-index --find-links dist --force-reinstall --no-deps
+          pytest -v --tb=short tests/test_edge_cases.py tests/test_python_bindings.py
 
   sdist:
+    name: sdist
     runs-on: ubuntu-latest
-    needs: [lint]
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -155,7 +295,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [lint, linux, macos, sdist]
+    needs: [fmt, clippy, rust-test, linux, macos, windows, sdist]
     timeout-minutes: 30
     permissions:
       # Use to sign the release artifacts

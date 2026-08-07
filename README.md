@@ -4,7 +4,7 @@
 
 `tsdistances` is a Python library (with Rust backend) for computing various pairwise distances between sets of time series data. 
 
-It provides eﬀicient implementation of elastic distance measures such as Dynamic Time Warping (DTW), Longest Common Subsequence (LCSS), Time Warping Edit (TWE), and many others.
+It provides efficient implementation of elastic distance measures such as Dynamic Time Warping (DTW), Longest Common Subsequence (LCSS), Time Warping Edit (TWE), and many others.
 
 The library is designed to be fast and scalable, leveraging parallel computation and GPU support via Vulkan for improved performance.
 
@@ -167,7 +167,7 @@ See [matlab/README.md](matlab/README.md) for detailed MATLAB installation instru
 
     # Pairwise DTW distances within the set X (on CPU, single thread)
     pairwise_distances = tsdistances.dtw_distance(X, par=False, device='cpu')
-    print("Pairwise DTW distance matrix (CPU, 4 jobs):")
+    print("Pairwise DTW distance matrix (CPU, single thread):")
     print(pairwise_distances)
 
     # Compare two batches: compute distances between each element of X and each element of Y
@@ -183,7 +183,7 @@ Notes
 
 3. If `v` is not provided, the function computes pairwise distances within `u`.
 
-Important: Results will differ between CPU and GPU due to f64ing-point precision:
+Important: Results will differ between CPU and GPU due to floating-point precision:
 
     CPU computations use f64 (double precision) for higher numerical accuracy.
 

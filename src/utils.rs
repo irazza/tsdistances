@@ -12,12 +12,14 @@ pub fn next_multiple_of_n(x: usize, n: usize) -> usize {
     x.div_ceil(n) * n
 }
 
-pub fn derivate(x: &[Vec<f64>]) -> Vec<Vec<f64>> {
+pub fn derivate<R: AsRef<[f64]>>(x: &[R]) -> Vec<Vec<f64>> {
     let mut x_d = Vec::with_capacity(x.len());
     for item in x {
+        let item = item.as_ref();
         x_d.push(vec![0.0; item.len() - 2]);
     }
     for (idx, item) in x.iter().enumerate() {
+        let item = item.as_ref();
         for j in 1..item.len() - 1 {
             x_d[idx][j - 1] = ((item[j] - item[j - 1]) + (item[j + 1] - item[j - 1]) / 2.0) / 2.0;
         }

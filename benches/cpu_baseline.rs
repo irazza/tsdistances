@@ -45,8 +45,8 @@ fn bench_pairwise_euclidean_32x32_len256(b: &mut Bencher) {
 
     b.iter(|| {
         black_box(core::euclidean(
-            black_box(x1.clone()),
-            black_box(Some(x2.clone())),
+            black_box(x1.as_slice()),
+            black_box(Some(x2.as_slice())),
             black_box(false),
         ))
         .unwrap()
@@ -60,8 +60,8 @@ fn bench_pairwise_dtw_16x16_len256(b: &mut Bencher) {
 
     b.iter(|| {
         black_box(core::dtw(
-            black_box(x1.clone()),
-            black_box(Some(x2.clone())),
+            black_box(x1.as_slice()),
+            black_box(Some(x2.as_slice())),
             black_box(1.0),
             black_box(false),
             black_box("cpu"),
@@ -77,8 +77,8 @@ fn bench_pairwise_adtw_16x16_len256(b: &mut Bencher) {
 
     b.iter(|| {
         black_box(core::adtw(
-            black_box(x1.clone()),
-            black_box(Some(x2.clone())),
+            black_box(x1.as_slice()),
+            black_box(Some(x2.as_slice())),
             black_box(1.0),
             black_box(0.05),
             black_box(false),

@@ -1,6 +1,6 @@
 [package]
 name = "tsdistances"
-version = "0.1.9-dev"
+version = "0.1.9"
 description = "tsdistances is a Python library (with Rust backend) for computing various pairwise distances between sets of time series data."
 edition = "2024"
 authors = [
@@ -12,6 +12,7 @@ authors = [
 [dependencies]
 catch22 = { git = "https://github.com/irazza/pycatch22-rs.git", package = "catch22" }
 ctrlc = { version = "3.5", optional = true }
+numpy = { version = "0.29", optional = true }
 pyo3 = { version = "0.29", features = ["extension-module"], optional = true }
 rayon = "1.12"
 rustfft = "6.4"
@@ -34,7 +35,7 @@ strip = true
 [features]
 default = ["python", "gpu", "use-compiled-tools"]
 gpu = ["dep:tsdistances_gpu", "dep:vulkano"]
-python = ["pyo3", "ctrlc"]
+python = ["pyo3", "ctrlc", "numpy"]
 use-compiled-tools = [
     "gpu",
     "tsdistances_gpu/use-compiled-tools",

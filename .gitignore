@@ -9,6 +9,7 @@ compute_ee.py
 .history/
 requirements*
 .pytest_cache/
+.numba_cache/
 .DS_Store
 *.lock
 *.svg

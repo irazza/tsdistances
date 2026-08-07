@@ -41,18 +41,18 @@ fn gpu_feature_error() -> DistanceError {
 }
 
 #[cfg(feature = "gpu")]
-fn compute_distance_gpu(
+fn compute_distance_gpu<R: AsRef<[f64]> + Sync>(
     distance: impl (Fn(&Vec<Vec<f32>>, &Vec<Vec<f32>>) -> Vec<Vec<f32>>) + Sync + Send,
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+    x1: &[R],
+    x2: Option<&[R]>,
 ) -> Vec<Vec<f64>> {
     let x1 = x1
-        .into_iter()
-        .map(|v| v.into_iter().map(|f| f as f32).collect())
+        .iter()
+        .map(|v| v.as_ref().iter().map(|&f| f as f32).collect())
         .collect::<Vec<_>>();
     let x2 = x2.map(|x2| {
-        x2.into_iter()
-            .map(|v| v.into_iter().map(|f| f as f32).collect())
+        x2.iter()
+            .map(|v| v.as_ref().iter().map(|&f| f as f32).collect())
             .collect::<Vec<_>>()
     });
 
@@ -65,27 +65,30 @@ fn compute_distance_gpu(
 }
 
 /// Computes the pairwise distance between two sets of timeseries.
-pub fn compute_distance(
+pub fn compute_distance<R: AsRef<[f64]> + Sync>(
     distance: impl (Fn(&[f64], &[f64]) -> f64) + Sync + Send,
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+    x1: &[R],
+    x2: Option<&[R]>,
     par: bool,
 ) -> Vec<Vec<f64>> {
-    let x1 = x1.into_iter().enumerate().collect::<Vec<_>>();
     let distance_matrix = if par {
         x1.par_iter()
+            .enumerate()
             .map(|(i, a)| {
-                if let Some(x2) = &x2 {
+                let a = a.as_ref();
+                if let Some(x2) = x2 {
                     x2.iter()
                         .map(|b| {
+                            let b = b.as_ref();
                             let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
                             distance(a, b)
                         })
                         .collect::<Vec<_>>()
                 } else {
                     x1.iter()
-                        .take(*i)
-                        .map(|(_, b)| {
+                        .take(i)
+                        .map(|b| {
+                            let b = b.as_ref();
                             let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
                             distance(a, b)
                         })
@@ -95,18 +98,22 @@ pub fn compute_distance(
             .collect::<Vec<_>>()
     } else {
         x1.iter()
+            .enumerate()
             .map(|(i, a)| {
-                if let Some(x2) = &x2 {
+                let a = a.as_ref();
+                if let Some(x2) = x2 {
                     x2.iter()
                         .map(|b| {
+                            let b = b.as_ref();
                             let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
                             distance(a, b)
                         })
                         .collect::<Vec<_>>()
                 } else {
                     x1.iter()
-                        .take(*i)
-                        .map(|(_, b)| {
+                        .take(i)
+                        .map(|b| {
+                            let b = b.as_ref();
                             let (a, b) = if a.len() > b.len() { (b, a) } else { (a, b) };
                             distance(a, b)
                         })
@@ -134,7 +141,11 @@ pub fn compute_distance(
 }
 
 /// Compute Euclidean distance matrix
-pub fn euclidean(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Result<Vec<Vec<f64>>> {
+pub fn euclidean<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
+    par: bool,
+) -> Result<Vec<Vec<f64>>> {
     let distance_matrix = compute_distance(
         |a, b| {
             a.iter()
@@ -171,19 +182,19 @@ fn catch22_features(x: &[f64]) -> Vec<f64> {
 }
 
 /// Compute Catch22-Euclidean distance matrix
-pub fn catch_euclidean(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn catch_euclidean<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     par: bool,
 ) -> Result<Vec<Vec<f64>>> {
     let x1 = x1
         .iter()
-        .map(|x| catch22_features(x))
+        .map(|x| catch22_features(x.as_ref()))
         .collect::<Vec<Vec<f64>>>();
 
     let x2 = x2.map(|x2| {
         x2.iter()
-            .map(|x| catch22_features(x))
+            .map(|x| catch22_features(x.as_ref()))
             .collect::<Vec<Vec<f64>>>()
     });
 
@@ -262,13 +273,13 @@ pub fn catch_euclidean(
     } else {
         None
     };
-    euclidean(x1, x2, par)
+    euclidean(&x1, x2.as_deref(), par)
 }
 
 /// Compute ERP (Edit Distance with Real Penalty) distance matrix
-pub fn erp(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn erp<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     gap_penalty: f64,
     par: bool,
@@ -346,9 +357,9 @@ pub fn erp(
 }
 
 /// Compute LCSS (Longest Common Subsequence) distance matrix
-pub fn lcss(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn lcss<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     epsilon: f64,
     par: bool,
@@ -430,9 +441,9 @@ pub fn lcss(
 }
 
 /// Compute DTW (Dynamic Time Warping) distance matrix
-pub fn dtw(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn dtw<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     par: bool,
     device: &str,
@@ -486,22 +497,22 @@ pub fn dtw(
 }
 
 /// Compute DDTW (Derivative Dynamic Time Warping) distance matrix
-pub fn ddtw(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn ddtw<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     par: bool,
     device: &str,
 ) -> Result<Vec<Vec<f64>>> {
-    let x1_d = derivate(&x1);
-    let x2_d = x2.as_ref().map(|x| derivate(x));
-    dtw(x1_d, x2_d, sakoe_chiba_band, par, device)
+    let x1_d = derivate(x1);
+    let x2_d = x2.map(derivate);
+    dtw(&x1_d, x2_d.as_deref(), sakoe_chiba_band, par, device)
 }
 
 /// Compute WDTW (Weighted Dynamic Time Warping) distance matrix
-pub fn wdtw(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn wdtw<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     g: f64,
     par: bool,
@@ -520,9 +531,9 @@ pub fn wdtw(
             // behavior (a single global weight vector) and avoids recomputing
             // the weights for every pair. For equal-length inputs (all current
             // tests and the MATLAB FFI) this is identical to the per-pair form.
-            let mut max_len = x1.iter().map(|v| v.len()).max().unwrap_or(0);
-            if let Some(x2) = &x2 {
-                max_len = max_len.max(x2.iter().map(|v| v.len()).max().unwrap_or(0));
+            let mut max_len = x1.iter().map(|v| v.as_ref().len()).max().unwrap_or(0);
+            if let Some(x2) = x2 {
+                max_len = max_len.max(x2.iter().map(|v| v.as_ref().len()).max().unwrap_or(0));
             }
             let weights = dtw_weights(max_len, g);
             let distance_matrix = compute_distance(
@@ -588,23 +599,23 @@ pub fn wdtw(
 }
 
 /// Compute WDDTW (Weighted Derivative Dynamic Time Warping) distance matrix
-pub fn wddtw(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn wddtw<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     g: f64,
     par: bool,
     device: &str,
 ) -> Result<Vec<Vec<f64>>> {
-    let x1_d = derivate(&x1);
-    let x2_d = x2.as_ref().map(|x| derivate(x));
-    wdtw(x1_d, x2_d, sakoe_chiba_band, g, par, device)
+    let x1_d = derivate(x1);
+    let x2_d = x2.map(derivate);
+    wdtw(&x1_d, x2_d.as_deref(), sakoe_chiba_band, g, par, device)
 }
 
 /// Compute ADTW (Amerced Dynamic Time Warping) distance matrix
-pub fn adtw(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn adtw<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     warp_penalty: f64,
     par: bool,
@@ -694,9 +705,9 @@ fn likely(b: bool) -> bool {
 }
 
 /// Compute MSM (Move-Split-Merge) distance matrix
-pub fn msm(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn msm<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     par: bool,
     device: &str,
@@ -776,9 +787,9 @@ pub fn msm(
 }
 
 /// Compute TWE (Time Warp Edit) distance matrix
-pub fn twe(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn twe<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     sakoe_chiba_band: f64,
     stiffness: f64,
     penalty: f64,
@@ -881,7 +892,7 @@ pub fn twe(
 }
 
 /// Compute SBD (Shape-Based Distance) distance matrix
-pub fn sbd(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Result<Vec<Vec<f64>>> {
+pub fn sbd<R: AsRef<[f64]> + Sync>(x1: &[R], x2: Option<&[R]>, par: bool) -> Result<Vec<Vec<f64>>> {
     let distance_matrix = compute_distance(
         |a, b| {
             let a = zscore(a);
@@ -898,9 +909,9 @@ pub fn sbd(x1: Vec<Vec<f64>>, x2: Option<Vec<Vec<f64>>>, par: bool) -> Result<Ve
 }
 
 /// Compute MP (Matrix Profile) distance matrix
-pub fn mp(
-    x1: Vec<Vec<f64>>,
-    x2: Option<Vec<Vec<f64>>>,
+pub fn mp<R: AsRef<[f64]> + Sync>(
+    x1: &[R],
+    x2: Option<&[R]>,
     window: i32,
     par: bool,
 ) -> Result<Vec<Vec<f64>>> {
@@ -1021,14 +1032,14 @@ mod tests {
     #[test]
     fn euclidean_matches_doc_examples_and_pairwise_symmetry() {
         let (x1, x2) = sample_xy();
-        let cross = euclidean(x1.clone(), Some(x2), false).unwrap();
+        let cross = euclidean(&x1, Some(&x2), false).unwrap();
         let expected = vec![
             vec![2.0_f64.sqrt(), 6.0_f64.sqrt()],
             vec![1.0, 3.0_f64.sqrt()],
         ];
         assert_matrix_close(&cross, &expected);
 
-        let pairwise = euclidean(x1, None, false).unwrap();
+        let pairwise = euclidean(&x1, None, false).unwrap();
         assert_close(pairwise[0][0], 0.0);
         assert_close(pairwise[1][1], 0.0);
         assert_close(pairwise[0][1], pairwise[1][0]);
@@ -1041,43 +1052,37 @@ mod tests {
         let b = vec![vec![0.0, 1.0, 0.0]];
 
         assert_close(
-            erp(a.clone(), Some(b.clone()), 1.0, 0.0, false, "cpu").unwrap()[0][0],
+            erp(&a, Some(&b), 1.0, 0.0, false, "cpu").unwrap()[0][0],
             2.0,
         );
         assert_close(
-            lcss(a.clone(), Some(b.clone()), 1.0, 0.5, false, "cpu").unwrap()[0][0],
+            lcss(&a, Some(&b), 1.0, 0.5, false, "cpu").unwrap()[0][0],
             1.0 / 3.0,
         );
-        assert_close(
-            dtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0],
-            1.0,
-        );
+        assert_close(dtw(&a, Some(&b), 1.0, false, "cpu").unwrap()[0][0], 1.0);
         let a_d = derivate(&a);
         let b_d = derivate(&b);
         assert_matrix_close(
-            &ddtw(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap(),
-            &dtw(a_d.clone(), Some(b_d.clone()), 1.0, false, "cpu").unwrap(),
+            &ddtw(&a, Some(&b), 1.0, false, "cpu").unwrap(),
+            &dtw(&a_d, Some(&b_d), 1.0, false, "cpu").unwrap(),
         );
         assert_close(
-            wdtw(a.clone(), Some(a.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0],
+            wdtw(&a, Some(&a), 1.0, 0.05, false, "cpu").unwrap()[0][0],
             0.0,
         );
-        assert!(wdtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap()[0][0] >= 0.0);
+        assert!(wdtw(&a, Some(&b), 1.0, 0.05, false, "cpu").unwrap()[0][0] >= 0.0);
         assert_matrix_close(
-            &wddtw(a.clone(), Some(b.clone()), 1.0, 0.05, false, "cpu").unwrap(),
-            &wdtw(a_d, Some(b_d), 1.0, 0.05, false, "cpu").unwrap(),
+            &wddtw(&a, Some(&b), 1.0, 0.05, false, "cpu").unwrap(),
+            &wdtw(&a_d, Some(&b_d), 1.0, 0.05, false, "cpu").unwrap(),
         );
         assert_close(
-            adtw(a.clone(), Some(a.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0],
+            adtw(&a, Some(&a), 1.0, 1.0, false, "cpu").unwrap()[0][0],
             0.0,
         );
-        assert!(adtw(a.clone(), Some(b.clone()), 1.0, 1.0, false, "cpu").unwrap()[0][0] >= 0.0);
+        assert!(adtw(&a, Some(&b), 1.0, 1.0, false, "cpu").unwrap()[0][0] >= 0.0);
+        assert_close(msm(&a, Some(&b), 1.0, false, "cpu").unwrap()[0][0], 2.0);
         assert_close(
-            msm(a.clone(), Some(b.clone()), 1.0, false, "cpu").unwrap()[0][0],
-            2.0,
-        );
-        assert_close(
-            twe(a.clone(), Some(b), 1.0, 0.001, 1.0, false, "cpu").unwrap()[0][0],
+            twe(&a, Some(&b), 1.0, 0.001, 1.0, false, "cpu").unwrap()[0][0],
             4.0,
         );
     }
@@ -1092,20 +1097,20 @@ mod tests {
         let y = vec![vec![0.0, 0.5, 1.5, 3.0], vec![2.0, 1.0, 0.5, 0.0]];
 
         assert_matrix_close(
-            &euclidean(x.clone(), Some(y.clone()), false).unwrap(),
-            &euclidean(x.clone(), Some(y.clone()), true).unwrap(),
+            &euclidean(&x, Some(&y), false).unwrap(),
+            &euclidean(&x, Some(&y), true).unwrap(),
         );
         assert_matrix_close(
-            &dtw(x.clone(), Some(y.clone()), 1.0, false, "cpu").unwrap(),
-            &dtw(x.clone(), Some(y.clone()), 1.0, true, "cpu").unwrap(),
+            &dtw(&x, Some(&y), 1.0, false, "cpu").unwrap(),
+            &dtw(&x, Some(&y), 1.0, true, "cpu").unwrap(),
         );
         assert_matrix_close(
-            &sbd(x.clone(), Some(y.clone()), false).unwrap(),
-            &sbd(x.clone(), Some(y.clone()), true).unwrap(),
+            &sbd(&x, Some(&y), false).unwrap(),
+            &sbd(&x, Some(&y), true).unwrap(),
         );
         assert_matrix_close(
-            &mp(x.clone(), Some(y.clone()), 2, false).unwrap(),
-            &mp(x, Some(y), 2, true).unwrap(),
+            &mp(&x, Some(&y), 2, false).unwrap(),
+            &mp(&x, Some(&y), 2, true).unwrap(),
         );
     }
 
@@ -1118,8 +1123,8 @@ mod tests {
         ];
 
         for matrix in [
-            catch_euclidean(x.clone(), None, false).unwrap(),
-            sbd(x, None, false).unwrap(),
+            catch_euclidean(&x, None, false).unwrap(),
+            sbd(&x, None, false).unwrap(),
         ] {
             for (i, row) in matrix.iter().enumerate() {
                 assert_close(row[i], 0.0);
@@ -1133,34 +1138,34 @@ mod tests {
     #[test]
     fn parameter_validation_returns_expected_errors() {
         let x = vec![vec![0.0, 1.0, 2.0]];
-        let y = Some(vec![vec![0.0, 1.0, 2.0]]);
+        let y = vec![vec![0.0, 1.0, 2.0]];
 
         assert!(matches!(
-            erp(x.clone(), y.clone(), 1.0, -1.0, false, "cpu"),
+            erp(&x, Some(&y), 1.0, -1.0, false, "cpu"),
             Err(DistanceError::InvalidParameter(msg)) if msg.contains("Gap penalty")
         ));
         assert!(matches!(
-            lcss(x.clone(), y.clone(), 1.0, -0.1, false, "cpu"),
+            lcss(&x, Some(&y), 1.0, -0.1, false, "cpu"),
             Err(DistanceError::InvalidParameter(msg)) if msg.contains("Epsilon")
         ));
         assert!(matches!(
-            dtw(x.clone(), y.clone(), 1.1, false, "cpu"),
+            dtw(&x, Some(&y), 1.1, false, "cpu"),
             Err(DistanceError::InvalidParameter(msg)) if msg.contains("Sakoe-Chiba")
         ));
         assert!(matches!(
-            adtw(x.clone(), y.clone(), 1.0, -0.1, false, "cpu"),
+            adtw(&x, Some(&y), 1.0, -0.1, false, "cpu"),
             Err(DistanceError::InvalidParameter(msg)) if msg.contains("Warp penalty")
         ));
         assert!(matches!(
-            twe(x.clone(), y.clone(), 1.0, -0.1, 1.0, false, "cpu"),
+            twe(&x, Some(&y), 1.0, -0.1, 1.0, false, "cpu"),
             Err(DistanceError::InvalidParameter(msg)) if msg.contains("Stiffness")
         ));
         assert!(matches!(
-            twe(x.clone(), y.clone(), 1.0, 0.1, -1.0, false, "cpu"),
+            twe(&x, Some(&y), 1.0, 0.1, -1.0, false, "cpu"),
             Err(DistanceError::InvalidParameter(msg)) if msg.contains("Penalty")
         ));
         assert!(matches!(
-            msm(x.clone(), y.clone(), 0.5, false, "bogus"),
+            msm(&x, Some(&y), 0.5, false, "bogus"),
             Err(DistanceError::InvalidParameter(msg)) if msg.contains("Device")
         ));
     }
@@ -1184,7 +1189,7 @@ mod tests {
         // does) yields distance 0; the old max-length normalization would not.
         let a = vec![vec![0.0, 1.0, 2.0]];
         let b = vec![vec![0.0, 1.0, 2.0, 9.0, 9.0]];
-        let d = lcss(a, Some(b), 1.0, 0.5, false, "cpu").unwrap();
+        let d = lcss(&a, Some(&b), 1.0, 0.5, false, "cpu").unwrap();
         assert_close(d[0][0], 0.0);
     }
 
@@ -1194,7 +1199,7 @@ mod tests {
         // usize subtraction when picking the selection index.
         let x = vec![vec![1.0, 2.0, 3.0]];
         let y = vec![vec![3.0, 2.0, 1.0]];
-        let d = mp(x, Some(y), 20, false).unwrap();
+        let d = mp(&x, Some(&y), 20, false).unwrap();
         assert!(d[0][0].is_finite());
     }
 }

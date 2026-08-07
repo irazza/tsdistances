@@ -221,7 +221,7 @@ pub unsafe extern "C" fn tsd_euclidean(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::euclidean(x1, x2, parallel) {
+    match core::euclidean(&x1, x2.as_deref(), parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -244,7 +244,7 @@ pub unsafe extern "C" fn tsd_catch_euclidean(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::catch_euclidean(x1, x2, parallel) {
+    match core::catch_euclidean(&x1, x2.as_deref(), parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -269,7 +269,14 @@ pub unsafe extern "C" fn tsd_erp(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::erp(x1, x2, sakoe_chiba_band, gap_penalty, parallel, "cpu") {
+    match core::erp(
+        &x1,
+        x2.as_deref(),
+        sakoe_chiba_band,
+        gap_penalty,
+        parallel,
+        "cpu",
+    ) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -294,7 +301,14 @@ pub unsafe extern "C" fn tsd_lcss(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::lcss(x1, x2, sakoe_chiba_band, epsilon, parallel, "cpu") {
+    match core::lcss(
+        &x1,
+        x2.as_deref(),
+        sakoe_chiba_band,
+        epsilon,
+        parallel,
+        "cpu",
+    ) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -318,7 +332,7 @@ pub unsafe extern "C" fn tsd_dtw(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::dtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
+    match core::dtw(&x1, x2.as_deref(), sakoe_chiba_band, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -342,7 +356,7 @@ pub unsafe extern "C" fn tsd_ddtw(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::ddtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
+    match core::ddtw(&x1, x2.as_deref(), sakoe_chiba_band, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -367,7 +381,7 @@ pub unsafe extern "C" fn tsd_wdtw(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::wdtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
+    match core::wdtw(&x1, x2.as_deref(), sakoe_chiba_band, g, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -392,7 +406,7 @@ pub unsafe extern "C" fn tsd_wddtw(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::wddtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
+    match core::wddtw(&x1, x2.as_deref(), sakoe_chiba_band, g, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -417,7 +431,14 @@ pub unsafe extern "C" fn tsd_adtw(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::adtw(x1, x2, sakoe_chiba_band, warp_penalty, parallel, "cpu") {
+    match core::adtw(
+        &x1,
+        x2.as_deref(),
+        sakoe_chiba_band,
+        warp_penalty,
+        parallel,
+        "cpu",
+    ) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -441,7 +462,7 @@ pub unsafe extern "C" fn tsd_msm(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::msm(x1, x2, cost, parallel, "cpu") {
+    match core::msm(&x1, x2.as_deref(), cost, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -468,8 +489,8 @@ pub unsafe extern "C" fn tsd_twe(
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
     match core::twe(
-        x1,
-        x2,
+        &x1,
+        x2.as_deref(),
         sakoe_chiba_band,
         stiffness,
         penalty,
@@ -498,7 +519,7 @@ pub unsafe extern "C" fn tsd_sbd(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::sbd(x1, x2, parallel) {
+    match core::sbd(&x1, x2.as_deref(), parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -522,7 +543,7 @@ pub unsafe extern "C" fn tsd_mp(
     let (x1, x2) =
         unsafe { c_arrays_to_vecs(x1_data, x1_rows, x1_cols, x2_data, x2_rows, x2_cols) };
 
-    match core::mp(x1, x2, window_size as i32, parallel) {
+    match core::mp(&x1, x2.as_deref(), window_size as i32, parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -551,7 +572,7 @@ pub unsafe extern "C" fn tsd_euclidean_ragged(
         return DistanceResult::error(2);
     }
 
-    match core::euclidean(x1, x2, parallel) {
+    match core::euclidean(&x1, x2.as_deref(), parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -580,7 +601,7 @@ pub unsafe extern "C" fn tsd_catch_euclidean_ragged(
         return DistanceResult::error(2);
     }
 
-    match core::catch_euclidean(x1, x2, parallel) {
+    match core::catch_euclidean(&x1, x2.as_deref(), parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -607,7 +628,14 @@ pub unsafe extern "C" fn tsd_erp_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::erp(x1, x2, sakoe_chiba_band, gap_penalty, parallel, "cpu") {
+    match core::erp(
+        &x1,
+        x2.as_deref(),
+        sakoe_chiba_band,
+        gap_penalty,
+        parallel,
+        "cpu",
+    ) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -634,7 +662,14 @@ pub unsafe extern "C" fn tsd_lcss_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::lcss(x1, x2, sakoe_chiba_band, epsilon, parallel, "cpu") {
+    match core::lcss(
+        &x1,
+        x2.as_deref(),
+        sakoe_chiba_band,
+        epsilon,
+        parallel,
+        "cpu",
+    ) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -660,7 +695,7 @@ pub unsafe extern "C" fn tsd_dtw_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::dtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
+    match core::dtw(&x1, x2.as_deref(), sakoe_chiba_band, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -686,7 +721,7 @@ pub unsafe extern "C" fn tsd_ddtw_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::ddtw(x1, x2, sakoe_chiba_band, parallel, "cpu") {
+    match core::ddtw(&x1, x2.as_deref(), sakoe_chiba_band, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -713,7 +748,7 @@ pub unsafe extern "C" fn tsd_wdtw_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::wdtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
+    match core::wdtw(&x1, x2.as_deref(), sakoe_chiba_band, g, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -740,7 +775,7 @@ pub unsafe extern "C" fn tsd_wddtw_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::wddtw(x1, x2, sakoe_chiba_band, g, parallel, "cpu") {
+    match core::wddtw(&x1, x2.as_deref(), sakoe_chiba_band, g, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -767,7 +802,14 @@ pub unsafe extern "C" fn tsd_adtw_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::adtw(x1, x2, sakoe_chiba_band, warp_penalty, parallel, "cpu") {
+    match core::adtw(
+        &x1,
+        x2.as_deref(),
+        sakoe_chiba_band,
+        warp_penalty,
+        parallel,
+        "cpu",
+    ) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -793,7 +835,7 @@ pub unsafe extern "C" fn tsd_msm_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::msm(x1, x2, cost, parallel, "cpu") {
+    match core::msm(&x1, x2.as_deref(), cost, parallel, "cpu") {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -822,8 +864,8 @@ pub unsafe extern "C" fn tsd_twe_ragged(
     };
 
     match core::twe(
-        x1,
-        x2,
+        &x1,
+        x2.as_deref(),
         sakoe_chiba_band,
         stiffness,
         penalty,
@@ -854,7 +896,7 @@ pub unsafe extern "C" fn tsd_sbd_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::sbd(x1, x2, parallel) {
+    match core::sbd(&x1, x2.as_deref(), parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }
@@ -880,7 +922,7 @@ pub unsafe extern "C" fn tsd_mp_ragged(
         Err(code) => return DistanceResult::error(code),
     };
 
-    match core::mp(x1, x2, window_size as i32, parallel) {
+    match core::mp(&x1, x2.as_deref(), window_size as i32, parallel) {
         Ok(result) => DistanceResult::success(result),
         Err(_) => DistanceResult::error(1),
     }

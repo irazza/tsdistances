@@ -11,6 +11,13 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+concurrency:
+  # Auto-cancel superseded runs for the same branch/PR so transient-outage
+  # re-triggers don't pile up as stale "queued" runs. Never cancel tag/release
+  # runs (those must complete to publish artifacts).
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   checks: write

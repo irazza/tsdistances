@@ -1,0 +1,78 @@
+[package]
+name = "tsdistances_gpu"
+version = "0.1.0"
+edition = "2024"
+# maturin vendors in-tree path dependencies into the sdist, so without this the
+# 3.2 MB of ACSF1 test fixtures would ship inside every `pip install` tarball.
+# `exclude` only affects packaging -- `cargo test` still reads them from the
+# working tree.
+exclude = ["tests/ACSF1/*"]
+
+[lib]
+crate-type = ["dylib", "rlib"]
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+# Pin rust-gpu to a specific commit: spirv-builder/spirv-std are tied to an exact
+# rustc nightly (rust-toolchain.toml), so a floating branch would silently break
+# builds when rust-gpu advances past the pinned toolchain.
+[build-dependencies]
+spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false }
+
+[dev-dependencies]
+csv = "1.3.1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[dependencies]
+bytemuck = { version = "1.23.1", features = ["derive"] }
+
+# NOTE: profiles intentionally live in the workspace root Cargo.toml. Cargo
+# ignores `[profile.*]` in non-root manifests (it warns on every build), so the
+# `build-override` settings that make rustc_codegen_spirv compile at opt-level 3
+# only take effect from there.
+
+[target.'cfg(not(target_arch = "spirv"))'.dependencies]
+vulkano = { version = "0.35.1" }
+dashmap = "6.1.0"
+rspirv = "0.12.0"
+
+[target.'cfg(target_arch = "spirv")'.dependencies]
+# spirv-std 0.10 requires selecting a glam version via a `glam_*` feature.
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false, features = ["glam_0_33"] }
+
+# Lint debt inherited from the standalone tsdistances_gpu repository, which had
+# no CI and so had never been linted. CI now runs clippy with `-D warnings`, and
+# these are enumerated individually rather than blanket-allowed: every lint not
+# listed here is hard-denied, so new code cannot regress in other categories.
+#
+# Declared here rather than as `#![allow]` in lib.rs because each file under
+# tests/ is its own crate root; the manifest table covers lib, tests and benches
+# in one place.
+[lints.clippy]
+# These three are one design issue wearing three hats: every GPU entry point
+# threads five Vulkan handles by hand (device, queue, command-buffer allocator,
+# descriptor-set allocator, sub-buffer allocator) and takes `&Vec<Vec<f32>>`
+# rather than slices. Fixing it means reshaping the crate's public API, which is
+# deliberately out of scope for a repository merge -- see the `GpuContext`
+# follow-up. Deleting these three lines is the check that proves it landed.
+too_many_arguments = "allow"
+ptr_arg = "allow"
+type_complexity = "allow"
+# vulkano's handles are intentionally not `Send + Sync`, and wrapping them in
+# `Arc` is how vulkano itself hands them out -- this fires on correct usage.
+arc_with_non_send_sync = "allow"
+# The kernels and their CPU reference implementations index several arrays in
+# lockstep off one diagonal counter, where the index *is* the quantity being
+# reasoned about. Iterator form obscures the wavefront arithmetic.
+needless_range_loop = "allow"
+
+[features]
+default = ["use-compiled-tools"]
+use-compiled-tools = [
+    "spirv-builder/use-compiled-tools",
+]
+use-installed-tools = [
+    "spirv-builder/use-installed-tools",
+]

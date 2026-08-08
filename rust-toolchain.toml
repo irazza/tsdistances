@@ -3,5 +3,17 @@ channel = "nightly-2026-05-22"
 components = ["rust-src", "rustc-dev", "llvm-tools"]
 # commit_hash = e96c36b6f76833388c519561d145492d2c08db4e
 
-# Whenever changing the nightly channel, update the commit hash above, and make
-# sure to change `REQUIRED_TOOLCHAIN` in `crates/rustc_codegen_spirv/build.rs` also.
+# This file is the single source of truth for the whole workspace, including
+# crates/tsdistances_gpu. Cargo only honours the *root* rust-toolchain.toml, so
+# a copy inside the GPU crate would be silently ignored -- that is exactly why
+# the previous split-repo layout could drift.
+#
+# The channel above and the `spirv-builder` / `spirv-std` `rev` in
+# crates/tsdistances_gpu/Cargo.toml are ONE version, not two: rust-gpu's
+# rustc_codegen_spirv is a rustc backend built against an exact nightly, and it
+# refuses to load against any other. Bump them together, in the same commit, or
+# the GPU build breaks with a toolchain-mismatch error rather than anything
+# that points at the real cause.
+#
+# `rust-src`, `rustc-dev` and `llvm-tools` are required by rust-gpu (it builds
+# core for the spirv-unknown-* target), not by the CPU crate.

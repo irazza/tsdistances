@@ -134,6 +134,61 @@ cargo build --release --no-default-features --features matlab
 
 See [matlab/README.md](matlab/README.md) for detailed MATLAB installation instructions. 
 
+## Repository Layout
+
+This is a Cargo workspace with two crates:
+
+```
+.                          # `tsdistances` -- CPU kernels, PyO3 and MATLAB bindings
+└── crates/
+    └── tsdistances_gpu/   # rust-gpu / SPIR-V compute kernels
+```
+
+`crates/tsdistances_gpu` was developed in a separate repository
+([irazza/tsdistances_gpu](https://github.com/irazza/tsdistances_gpu), now
+archived) and was merged here with its full history.
+
+**The two crates cannot be collapsed into one.** `tsdistances_gpu` compiles
+*itself* to SPIR-V — its `build.rs` runs `SpirvBuilder::new(".")` and its
+`lib.rs` is `no_std` under `target_arch = "spirv"` — so it can never share a
+compilation unit with PyO3, rayon or rustfft. The split is a hard requirement of
+rust-gpu, not an organisational preference.
+
+### Toolchain coupling
+
+The nightly in `rust-toolchain.toml` and the `spirv-builder` / `spirv-std` `rev`
+in `crates/tsdistances_gpu/Cargo.toml` are **one version, not two**. rust-gpu's
+`rustc_codegen_spirv` is a rustc backend built against an exact nightly and
+refuses to load against any other, so bump them together in a single commit.
+Cargo only reads the workspace-root `rust-toolchain.toml`; a copy inside the GPU
+crate would be silently ignored.
+
+### Working on the GPU crate
+
+```bash
+cargo build   -p tsdistances_gpu --features use-compiled-tools
+cargo clippy  -p tsdistances_gpu --all-targets --features use-compiled-tools
+cargo test    -p tsdistances_gpu --features use-compiled-tools   # needs a Vulkan device
+```
+
+Always pass an explicit `-p`. A bare `--workspace` pulls the GPU crate into
+builds that deliberately exclude it — notably the Windows and Linux-aarch64
+wheels, which are CPU-only.
+
+Because the GPU history was joined with a subtree-style merge, its commits kept
+their original paths. `git blame` and `git bisect` work as normal, but a
+path-limited `git log` needs both the old and new path:
+
+```bash
+git blame crates/tsdistances_gpu/src/warps.rs                       # works directly
+git log -- crates/tsdistances_gpu/src/warps.rs src/warps.rs         # full history
+```
+
+### License
+
+`crates/tsdistances_gpu` carried no license file of its own; as part of this
+repository it is covered by the GPL-3.0 [LICENSE](LICENSE) at the root.
+
 ## Usage
 
 ### Example 1: Compute DTW Distance on CPU and GPU

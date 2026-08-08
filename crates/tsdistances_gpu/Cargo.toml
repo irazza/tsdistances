@@ -1,0 +1,57 @@
+[package]
+name = "tsdistances_gpu"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["dylib", "rlib"]
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+# Pin rust-gpu to a specific commit: spirv-builder/spirv-std are tied to an exact
+# rustc nightly (rust-toolchain.toml), so a floating branch would silently break
+# builds when rust-gpu advances past the pinned toolchain.
+[build-dependencies]
+spirv-builder = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false }
+
+[dev-dependencies]
+csv = "1.3.1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[dependencies]
+bytemuck = { version = "1.23.1", features = ["derive"] }
+
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.build-override]
+opt-level = 3
+debug = true
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 16
+strip = true
+
+
+[target.'cfg(not(target_arch = "spirv"))'.dependencies]
+vulkano = { version = "0.35.1" }
+dashmap = "6.1.0"
+rspirv = "0.12.0"
+
+[target.'cfg(target_arch = "spirv")'.dependencies]
+# spirv-std 0.10 requires selecting a glam version via a `glam_*` feature.
+spirv-std = { git = "https://github.com/Rust-GPU/rust-gpu.git", rev = "9453497884c28bd52405f0abc9bfc7d0b3374666", default-features = false, features = ["glam_0_33"] }
+
+[features]
+default = ["use-compiled-tools"]
+use-compiled-tools = [
+    "spirv-builder/use-compiled-tools",
+]
+use-installed-tools = [
+    "spirv-builder/use-installed-tools",
+]

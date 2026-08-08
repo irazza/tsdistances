@@ -1,9 +1,16 @@
+// Only ever constructed and read from inside the `#[spirv(compute(..))]` entry
+// points that `warp_kernel_spec!` generates, and those exist only on the SPIR-V
+// target. On the host build nothing references it, so gate the allow on the
+// target rather than silencing it everywhere -- that way genuinely dead code
+// here is still reported when compiling the shader.
+#[cfg_attr(not(target_arch = "spirv"), allow(dead_code))]
 pub struct GpuMatrix<'a> {
     diagonal: &'a mut [f32],
     diagonal_offset: usize,
     mask: usize,
 }
 
+#[cfg_attr(not(target_arch = "spirv"), allow(dead_code))]
 impl GpuMatrix<'_> {
     #[inline(always)]
     fn get_diagonal_cell(&self, _diag_row: usize, diag_offset: isize) -> f32 {

@@ -1,6 +1,13 @@
 // CPU reference implementations for correctness testing
 // These are simple, readable implementations to verify GPU results
 
+// This file is pulled in with `mod cpu_reference;` by several separate
+// integration-test binaries, each of which uses only a subset of the helpers.
+// Rust compiles the module once per binary, so every helper a given binary does
+// not call is reported dead there -- the usual false positive for a shared test
+// module, not actually unused code.
+#![allow(dead_code)]
+
 /// CPU reference implementation of DTW (Dynamic Time Warping)
 pub fn dtw_cpu(a: &[f32], b: &[f32]) -> f32 {
     let n = a.len();
@@ -149,7 +156,7 @@ pub fn wdtw_cpu(a: &[f32], b: &[f32], weights: &[f32]) -> f32 {
 
     for i in 1..=n {
         for j in 1..=m {
-            let weight_idx = ((i as i32 - j as i32).abs()) as usize;
+            let weight_idx = (i as i32 - j as i32).unsigned_abs() as usize;
             let weight = if weight_idx < weights.len() {
                 weights[weight_idx]
             } else {

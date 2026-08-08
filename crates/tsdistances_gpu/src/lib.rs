@@ -1,5 +1,9 @@
 #![cfg_attr(target_arch = "spirv", no_std)]
 #![allow(unexpected_cfgs)]
+// NOTE: the crate's clippy allow-list lives in the `[lints.clippy]` table of
+// Cargo.toml, not here. Inner attributes in this file would cover the library
+// only -- each file under tests/ is its own crate root and would need its own
+// copy -- whereas the manifest table applies to lib, tests and benches alike.
 
 pub mod kernels;
 
@@ -48,9 +52,7 @@ pub mod cpu {
             sba,
             dsa,
             sa,
-            ERPImpl {
-                gap_penalty: gap_penalty as f32,
-            },
+            ERPImpl { gap_penalty },
             a,
             b,
             f32::INFINITY,

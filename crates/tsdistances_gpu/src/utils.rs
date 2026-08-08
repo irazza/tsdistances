@@ -58,6 +58,11 @@ pub struct SubBuffersAllocator {
 pub struct BufferPool {
     /// Cached buffers keyed by size bucket (rounded up to power of 2)
     cached: Mutex<HashMap<u64, Vec<CachedBuffer>>>,
+    /// Never read, but deliberately retained: the pool hands out `Subbuffer`s
+    /// carved from this allocator and may outlive the caller that built it, so
+    /// holding the `Arc` keeps the allocator alive for as long as the buffers
+    /// it owns. Dropping the field would be a use-after-free waiting to happen.
+    #[allow(dead_code)]
     memory_allocator: Arc<StandardMemoryAllocator>,
 }
 
@@ -86,10 +91,10 @@ impl BufferPool {
     pub fn try_get(&self, min_size: u64) -> Option<(Subbuffer<[f32]>, Subbuffer<[f32]>)> {
         let bucket = Self::size_bucket(min_size);
         let mut cache = self.cached.lock().unwrap();
-        if let Some(buffers) = cache.get_mut(&bucket) {
-            if let Some(cached) = buffers.pop() {
-                return Some((cached.gpu, cached.cpu));
-            }
+        if let Some(buffers) = cache.get_mut(&bucket)
+            && let Some(cached) = buffers.pop()
+        {
+            return Some((cached.gpu, cached.cpu));
         }
         None
     }
@@ -98,7 +103,7 @@ impl BufferPool {
     pub fn return_buffer(&self, gpu: Subbuffer<[f32]>, cpu: Subbuffer<[f32]>) {
         let bucket = Self::size_bucket(gpu.len());
         let mut cache = self.cached.lock().unwrap();
-        let buffers = cache.entry(bucket).or_insert_with(Vec::new);
+        let buffers = cache.entry(bucket).or_default();
         // Limit cache size per bucket to prevent memory bloat
         if buffers.len() < 8 {
             buffers.push(CachedBuffer { gpu, cpu });
@@ -127,7 +132,7 @@ impl Clone for SubBuffersAllocator {
 impl SubBuffersAllocator {
     /// Clear and resize the arena. Only resizes if the new size is larger or significantly smaller.
     /// This reduces allocation overhead for repeated calls with similar sizes.
-    pub fn clear_with_size(&self, size: u64) -> () {
+    pub fn clear_with_size(&self, size: u64) {
         let current = self.current_size.load(std::sync::atomic::Ordering::Relaxed);
 
         // Only resize if:
@@ -227,11 +232,10 @@ static DEVICE_CORE: LazyLock<CachedCore> = LazyLock::new(|| {
         physical_device,
         DeviceCreateInfo {
             enabled_extensions: device_extensions,
-            enabled_features: {
-                let mut features = DeviceFeatures::default();
-                features.shader_int8 = true;
-                features.shader_int64 = true;
-                features
+            enabled_features: DeviceFeatures {
+                shader_int8: true,
+                shader_int64: true,
+                ..Default::default()
             },
             queue_create_infos: vec![QueueCreateInfo {
                 queue_family_index,
@@ -372,7 +376,7 @@ impl<T: BufferContents + Copy> SubBufferPair<T> {
         data: &[T],
         command_buffer: &mut AutoCommandBufferBuilder<L>,
     ) -> Subbuffer<[T]> {
-        self.cpu.write().unwrap()[0..data.len()].copy_from_slice(&data);
+        self.cpu.write().unwrap()[0..data.len()].copy_from_slice(data);
 
         command_buffer
             .copy_buffer(CopyBufferInfo::buffers(
@@ -435,5 +439,5 @@ pub fn compute_optimized_diag_len(len: usize, max_subgroup_size: usize) -> usize
 /// Compute next multiple of n (utility function)
 #[inline]
 pub fn next_multiple_of_n(x: usize, n: usize) -> usize {
-    (x + n - 1) / n * n
+    x.div_ceil(n) * n
 }

@@ -17,9 +17,6 @@ use vulkano::{
     sync::GpuFuture,
 };
 
-/// Number of rows to batch in a single dispatch when possible
-const ROWS_PER_BATCH: usize = 4;
-
 fn compute_sample_len(a: &Vec<Vec<f32>>) -> usize {
     a.iter().map(|x| x.len()).sum()
 }
@@ -27,8 +24,8 @@ fn compute_sample_len(a: &Vec<Vec<f32>>) -> usize {
 fn flatten_and_pad(a: &Vec<Vec<f32>>, pad: usize) -> Vec<f32> {
     let new_len = next_multiple_of_n(a.first().unwrap().len(), pad);
     let mut padded = vec![0.0; new_len * a.len()];
-    for (i, row) in a.into_iter().enumerate() {
-        for (j, val) in row.into_iter().enumerate() {
+    for (i, row) in a.iter().enumerate() {
+        for (j, val) in row.iter().enumerate() {
             padded[i * new_len + j] = *val;
         }
     }
@@ -73,13 +70,13 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
     let b_len = next_multiple_of_n(b.first().unwrap().len(), max_subgroup_size);
     let len = max(a_len, b_len);
 
-    let a_padded = flatten_and_pad(&a, max_subgroup_size);
-    let b_padded = flatten_and_pad(&b, max_subgroup_size);
+    let a_padded = flatten_and_pad(a, max_subgroup_size);
+    let b_padded = flatten_and_pad(b, max_subgroup_size);
 
     // Use optimized diagonal length calculation
     let diag_len = compute_optimized_diag_len(len, max_subgroup_size);
 
-    let max_pairs = (max_storage_buffer_size / diag_len).min(usize::MAX);
+    let max_pairs = max_storage_buffer_size / diag_len;
 
     let chunk_side = (max_pairs as f64).sqrt().floor() as usize;
     // to fill the gap in a or b chunk if one is too small
@@ -262,8 +259,8 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
 
         let kernel_params = self.kernel_params.as_mut().unwrap();
 
-        let a_gpu = self.a_buffer.move_gpu_data(&a_padded, &mut builder);
-        let b_gpu = self.b_buffer.move_gpu_data(&b_padded, &mut builder);
+        let a_gpu = self.a_buffer.move_gpu_data(a_padded, &mut builder);
+        let b_gpu = self.b_buffer.move_gpu_data(b_padded, &mut builder);
         let mut diagonal_buffer_gpu = self.diagonal_buffer.move_gpu(&mut builder, diagonal_size);
 
         // Number of kernel calls
@@ -283,7 +280,7 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
                 &a_gpu,
                 &b_gpu,
                 &mut diagonal_buffer_gpu,
-                &kernel_params,
+                kernel_params,
             );
 
             if i < (n_tiles_in_a - 1) {

@@ -1,5 +1,3 @@
-use std::fmt::write;
-
 use csv::ReaderBuilder;
 use tsdistances_gpu::{
     cpu::{adtw, dtw, erp, lcss, msm, twe, wdtw},
@@ -64,7 +62,7 @@ fn test_erp_distance() {
     let start_time = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();
 
-    let result = erp(
+    let _result = erp(
         device.clone(),
         queue.clone(),
         sba.clone(),
@@ -87,7 +85,7 @@ fn test_lcss_distance() {
 
     let start = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();
-    let result = lcss(
+    let _result = lcss(
         device.clone(),
         queue.clone(),
         sba.clone(),
@@ -110,7 +108,7 @@ fn test_dtw_distance() {
     let start_time = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();
 
-    let result = dtw(
+    let _result = dtw(
         device.clone(),
         queue.clone(),
         sba.clone(),
@@ -135,7 +133,7 @@ fn test_wdtw_distance() {
     let start = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();
 
-    let result = wdtw(
+    let _result = wdtw(
         device.clone(),
         queue.clone(),
         sba.clone(),
@@ -160,7 +158,7 @@ fn test_adtw_distance() {
     let start_time = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();
 
-    let result = adtw(
+    let _result = adtw(
         device.clone(),
         queue.clone(),
         sba.clone(),
@@ -183,7 +181,7 @@ fn test_msm_distance() {
     let start_time = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();
 
-    let result = msm(
+    let _result = msm(
         device.clone(),
         queue.clone(),
         sba.clone(),
@@ -208,7 +206,7 @@ fn test_twe_distance() {
     let start_time = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();
 
-    let result = twe(
+    let _result = twe(
         device.clone(),
         queue.clone(),
         sba.clone(),

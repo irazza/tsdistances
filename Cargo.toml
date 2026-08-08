@@ -1,5 +1,15 @@
 [workspace]
 members = ["crates/tsdistances_gpu"]
+# Pin bare `cargo build` / `cargo test` at the root to the tsdistances package.
+# Cargo already defaults to the root package when the workspace root is itself a
+# package, so this is belt-and-braces rather than a fix -- but the failure it
+# guards against is expensive and silent: maturin builds the CPU-only Windows
+# and aarch64 wheels with
+#   --no-default-features --features python,pyo3/extension-module
+# and if package selection ever widened to the whole workspace, that invocation
+# dies with "the package 'tsdistances_gpu' does not contain these features".
+# Building the GPU crate stays explicit, via `-p tsdistances_gpu`.
+default-members = ["."]
 resolver = "3"
 
 [package]

@@ -1,4 +1,6 @@
 target/
+# maturin's build output (`maturin build --out dist`, as CI and the README use)
+dist/
 .venv/
 .vscode/
 *.csv

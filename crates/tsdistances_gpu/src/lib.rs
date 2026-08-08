@@ -6,11 +6,11 @@ pub mod kernels;
 #[cfg(not(target_arch = "spirv"))]
 mod shader_load;
 #[cfg(not(target_arch = "spirv"))]
+pub mod timing;
+#[cfg(not(target_arch = "spirv"))]
 pub mod utils;
 #[cfg(not(target_arch = "spirv"))]
 pub mod warps;
-#[cfg(not(target_arch = "spirv"))]
-pub mod timing;
 
 #[cfg(not(target_arch = "spirv"))]
 pub mod cpu {

@@ -2,7 +2,7 @@ use std::fmt::write;
 
 use csv::ReaderBuilder;
 use tsdistances_gpu::{
-    cpu::{erp, lcss, dtw, wdtw, adtw, msm, twe},
+    cpu::{adtw, dtw, erp, lcss, msm, twe, wdtw},
     utils::get_device,
 };
 
@@ -13,7 +13,11 @@ where
 {
     let mut reader = ReaderBuilder::new()
         .has_headers(false)
-        .delimiter(if file_path.ends_with(".tsv") { b'\t' } else { b',' })
+        .delimiter(if file_path.ends_with(".tsv") {
+            b'\t'
+        } else {
+            b','
+        })
         .from_path(file_path)?;
 
     let mut records = Vec::new();
@@ -73,7 +77,6 @@ fn test_erp_distance() {
     let elapsed_time = start_time.elapsed();
     println!("ERP elapsed time: {:?}", elapsed_time);
     // write_csv("erp_result.csv", &result).unwrap();
-
 }
 
 #[test]
@@ -151,7 +154,7 @@ fn test_wdtw_distance() {
 fn test_adtw_distance() {
     let train_data: Vec<Vec<f32>> = read_txt("tests/ACSF1/ACSF1_TRAIN.csv").unwrap();
     let test_data: Vec<Vec<f32>> = read_txt("tests/ACSF1/ACSF1_TEST.csv").unwrap();
-    
+
     let w = 0.1;
 
     let start_time = std::time::Instant::now();

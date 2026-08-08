@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::{
     kernels::kernel_trait::GpuKernelImpl,
-    utils::{CommandBufferPool, SubBufferPair, SubBuffersAllocator, compute_optimized_diag_len, next_multiple_of_n},
+    utils::{
+        CommandBufferPool, SubBufferPair, SubBuffersAllocator, compute_optimized_diag_len,
+        next_multiple_of_n,
+    },
 };
 use std::cmp::max;
 use vulkano::{
@@ -86,10 +89,8 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
     let mut dist_matrix = vec![vec![0f32; b_count]; a_count];
 
     // Create command buffer pool for reuse across chunks
-    let command_pool = CommandBufferPool::new(
-        command_buffer_allocator.clone(),
-        queue.queue_family_index(),
-    );
+    let command_pool =
+        CommandBufferPool::new(command_buffer_allocator.clone(), queue.queue_family_index());
 
     let mut dp_buffers = DiamondPartitioning::new_with_pool(
         subbuffer_allocator.clone(),
@@ -224,7 +225,7 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
             let chunk_end = (chunk_start + chunk_init_size).min(diagonal_size);
             diagonal_buffer_cpu[chunk_start..chunk_end].fill(init_val);
         }
-        
+
         // Set initial diagonal values
         for i in 0..(a_count * b_count) {
             diagonal_buffer_cpu[i * diag_len] = 0.0;
@@ -323,4 +324,3 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
         }
     }
 }
-

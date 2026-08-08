@@ -129,7 +129,7 @@ impl SubBuffersAllocator {
     /// This reduces allocation overhead for repeated calls with similar sizes.
     pub fn clear_with_size(&self, size: u64) -> () {
         let current = self.current_size.load(std::sync::atomic::Ordering::Relaxed);
-        
+
         // Only resize if:
         // 1. New size is larger than current, OR
         // 2. New size is less than 25% of current (to reclaim memory)
@@ -137,16 +137,18 @@ impl SubBuffersAllocator {
         if size > current || size == 0 || (current > 0 && size < current / 4) {
             self.gpu.set_arena_size(size);
             self.cpu.set_arena_size(size);
-            self.host_visible.set_arena_size(size.min(DIRECT_UPLOAD_THRESHOLD as u64 * 4));
-            self.current_size.store(size, std::sync::atomic::Ordering::Relaxed);
+            self.host_visible
+                .set_arena_size(size.min(DIRECT_UPLOAD_THRESHOLD as u64 * 4));
+            self.current_size
+                .store(size, std::sync::atomic::Ordering::Relaxed);
         }
-        
+
         // Clear buffer pool when size is 0
         if size == 0 {
             self.buffer_pool.clear();
         }
     }
-    
+
     /// Ensure the allocator has at least the specified capacity.
     /// Pre-allocate with extra headroom to reduce future resizes.
     pub fn ensure_capacity(&self, required_size: u64) {
@@ -156,23 +158,25 @@ impl SubBuffersAllocator {
             let new_size = required_size + required_size / 2;
             self.gpu.set_arena_size(new_size);
             self.cpu.set_arena_size(new_size);
-            self.host_visible.set_arena_size((new_size / 4).min(DIRECT_UPLOAD_THRESHOLD as u64 * 8));
-            self.current_size.store(new_size, std::sync::atomic::Ordering::Relaxed);
+            self.host_visible
+                .set_arena_size((new_size / 4).min(DIRECT_UPLOAD_THRESHOLD as u64 * 8));
+            self.current_size
+                .store(new_size, std::sync::atomic::Ordering::Relaxed);
         }
     }
-    
+
     /// Get the buffer pool for caching allocations
     pub fn buffer_pool(&self) -> &Arc<BufferPool> {
         &self.buffer_pool
     }
-    
+
     /// Allocate host-visible GPU buffer for direct uploads
     pub fn allocate_host_visible(&self, length: u64) -> Subbuffer<[f32]> {
         self.host_visible
             .allocate_slice(length)
             .expect("failed to allocate host-visible buffer")
     }
-    
+
     /// Check if data size is suitable for direct upload
     pub fn should_use_direct_upload(data_size: usize) -> bool {
         data_size * std::mem::size_of::<f32>() <= DIRECT_UPLOAD_THRESHOLD
@@ -297,7 +301,8 @@ pub fn get_device() -> (
             buffer_usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_SRC,
             memory_type_filter: MemoryTypeFilter {
                 // Prefer host-visible device-local for unified memory architectures
-                required_flags: MemoryPropertyFlags::HOST_VISIBLE | MemoryPropertyFlags::HOST_COHERENT,
+                required_flags: MemoryPropertyFlags::HOST_VISIBLE
+                    | MemoryPropertyFlags::HOST_COHERENT,
                 preferred_flags: MemoryPropertyFlags::DEVICE_LOCAL,
                 not_preferred_flags: MemoryPropertyFlags::empty(),
             },

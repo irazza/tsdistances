@@ -42,8 +42,10 @@ jobs:
           rustup install ${{ env.RUST_TOOLCHAIN }}
           rustup component add rustfmt --toolchain ${{ env.RUST_TOOLCHAIN }}
           rustup default ${{ env.RUST_TOOLCHAIN }}
+      # --all covers every workspace member, i.e. the GPU crate too. Before the
+      # monorepo merge that crate had no CI of any kind and was never formatted.
       - name: Check formatting
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
 
   clippy:
     name: Clippy
@@ -62,9 +64,15 @@ jobs:
           rustup default ${{ env.RUST_TOOLCHAIN }}
       - uses: Swatinem/rust-cache@v2
       - name: Clippy (python + gpu bindings)
-        run: cargo clippy --all-targets --features python,use-compiled-tools -- -D warnings
+        run: cargo clippy -p tsdistances --all-targets --features python,use-compiled-tools -- -D warnings
       - name: Clippy (matlab bindings)
-        run: cargo clippy --lib --no-default-features --features matlab -- -D warnings
+        run: cargo clippy -p tsdistances --lib --no-default-features --features matlab -- -D warnings
+      # The GPU crate itself: linting the root package does NOT lint workspace
+      # members, so without an explicit -p this code stays unlinted (as it was
+      # for its whole life in the separate repo). rust-src/rustc-dev/llvm-tools
+      # are already installed above, which is what rust-gpu needs.
+      - name: Clippy (gpu kernels)
+        run: cargo clippy -p tsdistances_gpu --all-targets --features use-compiled-tools -- -D warnings
 
   rust-test:
     name: Rust unit tests
@@ -83,8 +91,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # The unit tests live in the binding-agnostic `core` module and are the
       # primary regression gate; they need neither the python nor the gpu build.
+      # Explicit -p so this can never widen into a workspace-wide build.
       - name: Run core unit tests
-        run: cargo test --lib --no-default-features
+        run: cargo test -p tsdistances --lib --no-default-features
+      # Compile-only gate for the GPU crate. Its tests call get_device() and
+      # need a real Vulkan device, which stock GitHub runners do not have -- but
+      # building them still catches the breakage that actually happens here
+      # (rust-gpu/nightly drift, kernel signature changes). Running them for
+      # real under lavapipe is a follow-up.
+      - name: Build GPU crate and link its tests
+        run: cargo test -p tsdistances_gpu --no-run --features use-compiled-tools
 
   rust-coverage:
     name: Rust coverage
@@ -104,7 +120,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate lcov coverage
-        run: cargo llvm-cov --lib --no-default-features --lcov --output-path lcov.info
+        run: cargo llvm-cov -p tsdistances --lib --no-default-features --lcov --output-path lcov.info
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -251,6 +267,10 @@ jobs:
       # CPU-only: the gpu feature pulls rust-gpu's rustc_codegen_spirv, whose
       # link step exceeds Windows' 65535-object limit (LNK1189). Windows wheels
       # therefore ship without GPU support.
+      # This stays true after the monorepo merge: tsdistances_gpu is an
+      # `optional` dependency behind the `gpu` feature, and maturin builds the
+      # root package only. Never add a bare `--workspace` to this job (or to the
+      # aarch64 leg) -- it would drag the GPU crate in and reintroduce LNK1189.
       - name: Build wheels (CPU-only)
         uses: PyO3/maturin-action@v1
         with:

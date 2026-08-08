@@ -1,3 +1,7 @@
+[workspace]
+members = ["crates/tsdistances_gpu"]
+resolver = "3"
+
 [package]
 name = "tsdistances"
 version = "0.1.9"
@@ -16,11 +20,10 @@ numpy = { version = "0.29", optional = true }
 pyo3 = { version = "0.29", features = ["extension-module"], optional = true }
 rayon = "1.12"
 rustfft = "6.4"
-#tsdistances_gpu = { version = "0.1.0", path = "../tsdistances_gpu", default-features = false }
 # vulkano is only needed by the GPU stack; gate it to the `gpu` feature so
 # CPU-only builds (e.g. the Windows wheels) don't compile it.
 vulkano = { version = "0.35.2", optional = true }
-tsdistances_gpu = { git = "https://github.com/irazza/tsdistances_gpu.git", default-features = false, optional = true }
+tsdistances_gpu = { path = "crates/tsdistances_gpu", version = "0.1.0", default-features = false, optional = true }
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
@@ -31,6 +34,22 @@ lto = true
 opt-level = 3
 codegen-units = 16
 strip = true
+
+# Hoisted from crates/tsdistances_gpu, where cargo silently ignored them
+# ("profiles for the non root package will be ignored"). rust-gpu's
+# rustc_codegen_spirv backend and the shader build script are the dominant cost
+# of a cold GPU build, and both are build-time artifacts -- compiling them
+# unoptimized, as we were, is the single most expensive default here. This does
+# apply to every build script and proc macro in the graph (syn, quote,
+# pyo3-macros), which is a one-time cold-build cost that the shader speedup
+# dwarfs.
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 16
+
+[profile.dev.build-override]
+opt-level = 3
+debug = true
 
 [features]
 default = ["python", "gpu", "use-compiled-tools"]

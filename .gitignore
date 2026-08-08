@@ -2,6 +2,10 @@ target/
 .venv/
 .vscode/
 *.csv
+# ...but the GPU crate's checked-in ACSF1 fixtures are .csv. They survive as
+# already-tracked files, so the blanket ignore above is invisible until someone
+# re-adds or moves them and git silently drops the change.
+!crates/tsdistances_gpu/tests/ACSF1/*.csv
 *.so
 *.pyd
 __pycache__/

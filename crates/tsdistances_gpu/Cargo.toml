@@ -2,6 +2,11 @@
 name = "tsdistances_gpu"
 version = "0.1.0"
 edition = "2024"
+# maturin vendors in-tree path dependencies into the sdist, so without this the
+# 3.2 MB of ACSF1 test fixtures would ship inside every `pip install` tarball.
+# `exclude` only affects packaging -- `cargo test` still reads them from the
+# working tree.
+exclude = ["tests/ACSF1/*"]
 
 [lib]
 crate-type = ["dylib", "rlib"]
@@ -23,20 +28,10 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [dependencies]
 bytemuck = { version = "1.23.1", features = ["derive"] }
 
-[profile.release.build-override]
-opt-level = 3
-codegen-units = 16
-
-[profile.dev.build-override]
-opt-level = 3
-debug = true
-
-[profile.release]
-lto = true
-opt-level = 3
-codegen-units = 16
-strip = true
-
+# NOTE: profiles intentionally live in the workspace root Cargo.toml. Cargo
+# ignores `[profile.*]` in non-root manifests (it warns on every build), so the
+# `build-override` settings that make rustc_codegen_spirv compile at opt-level 3
+# only take effect from there.
 
 [target.'cfg(not(target_arch = "spirv"))'.dependencies]
 vulkano = { version = "0.35.1" }

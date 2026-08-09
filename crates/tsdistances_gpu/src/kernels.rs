@@ -764,7 +764,14 @@ warp_kernel_spec! {
     }
     fn wdtw_distance[WDTWImpl](a[a_offset], b[b_offset], i, j, x, y, z, [], [], [], [], [weights: f32]) {
         let diff = a[a_offset + i as usize] - b[b_offset + j as usize];
-        let dist = diff * diff * weights[(i as i32 - j as i32).abs() as usize];
+        // The diamond computes cells outside the matrix (their results are discarded),
+        // and for those `|i - j|` can exceed the weight vector, which is only
+        // `max(a_len, b_len)` long. Reading past it is undefined: rust-gpu bounds-checks
+        // slice indexing, and on an out-of-range index the invocation stops -- silently
+        // abandoning whatever that thread still had to do. Clamp instead; these cells
+        // never reach the result, so any defined value will do.
+        let weight = weights[((i as i32 - j as i32).abs() as usize).min(weights.len() - 1)];
+        let dist = diff * diff * weight;
         dist + x.min(y.min(z))
     }
     fn msm_distance[MSMImpl](a[a_offset], b[b_offset], i, j, x, y, z, [], [], [], [], []) {

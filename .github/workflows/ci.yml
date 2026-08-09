@@ -114,10 +114,21 @@ jobs:
       # the wavefront reproduced *only* at lavapipe's subgroup width of 8 and were invisible
       # on a 64-wide AMD device, so a single-driver check would have missed them.
       - name: Install lavapipe (software Vulkan)
-        run: sudo apt-get install -y mesa-vulkan-drivers
+        # Deliberately no VK_ICD_FILENAMES: pinning it to a hard-coded path is how this
+        # first failed -- if the file is not exactly there, the loader enumerates *no*
+        # ICDs and `Instance::new` fails with VK_ERROR_INCOMPATIBLE_DRIVER, which reads
+        # like "your Vulkan is too old" rather than "that path was wrong". A runner has
+        # no other ICD installed, so plain enumeration finds lavapipe.
+        #
+        # `vulkaninfo --summary` is the gate: if no device is reachable, this step fails
+        # with a readable driver listing instead of an opaque unwrap() panic three layers
+        # into get_device().
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
+          ls -l /usr/share/vulkan/icd.d/
+          vulkaninfo --summary
       - name: CPU/GPU parity (lavapipe)
-        env:
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
         run: cargo test -p tsdistances --no-default-features --features use-compiled-tools --test cpu_gpu_parity
 
   rust-coverage:

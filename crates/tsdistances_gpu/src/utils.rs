@@ -205,7 +205,15 @@ static DEVICE_CORE: LazyLock<CachedCore> = LazyLock::new(|| {
             ..Default::default()
         },
     )
-    .unwrap();
+    // The bare `unwrap()` here reported "the requested version of Vulkan is not supported
+    // by the driver", which sounds like a driver-too-old problem but is what the loader
+    // returns when it finds *no* ICD at all -- including when `VK_ICD_FILENAMES` points at
+    // a path that does not exist. Say so, since that is the common cause.
+    .expect(
+        "could not create a Vulkan instance. The loader found no usable driver (ICD). \
+         Check that a Vulkan driver is installed, and that VK_ICD_FILENAMES / VK_DRIVER_FILES, \
+         if set, point at a file that exists. `vulkaninfo --summary` should list a device.",
+    );
 
     let device_extensions = DeviceExtensions::empty();
 

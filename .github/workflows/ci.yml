@@ -101,6 +101,35 @@ jobs:
       # real under lavapipe is a follow-up.
       - name: Build GPU crate and link its tests
         run: cargo test -p tsdistances_gpu --no-run --features use-compiled-tools
+      # The one GPU-crate test suite that needs no device: it disassembles the SPIR-V
+      # the build script just produced and asserts module-level invariants. This is the
+      # gate that a green build is NOT: the rust-gpu 0.9 -> 0.10.0-alpha.1 bump compiled
+      # and passed every test while silently emitting `GLSL.std.450 Pow` for `powi(2)`
+      # (undefined for the negative bases DTW feeds it) and requiring an `Int64`
+      # capability that locked the crate out of MoltenVK. Both are one assertion here.
+      - name: Check compiled shader invariants
+        run: cargo test -p tsdistances_gpu --features use-compiled-tools --test shader_invariants
+      # CPU-vs-GPU parity, run against lavapipe (Mesa's software Vulkan device) so it works
+      # on a runner with no GPU. This is not a nice-to-have: several wrong-answer bugs in
+      # the wavefront reproduced *only* at lavapipe's subgroup width of 8 and were invisible
+      # on a 64-wide AMD device, so a single-driver check would have missed them.
+      - name: Install lavapipe (software Vulkan)
+        # Deliberately no VK_ICD_FILENAMES: pinning it to a hard-coded path is how this
+        # first failed -- if the file is not exactly there, the loader enumerates *no*
+        # ICDs and `Instance::new` fails with VK_ERROR_INCOMPATIBLE_DRIVER, which reads
+        # like "your Vulkan is too old" rather than "that path was wrong". A runner has
+        # no other ICD installed, so plain enumeration finds lavapipe.
+        #
+        # `vulkaninfo --summary` is the gate: if no device is reachable, this step fails
+        # with a readable driver listing instead of an opaque unwrap() panic three layers
+        # into get_device().
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
+          ls -l /usr/share/vulkan/icd.d/
+          vulkaninfo --summary
+      - name: CPU/GPU parity (lavapipe)
+        run: cargo test -p tsdistances --no-default-features --features use-compiled-tools --test cpu_gpu_parity
 
   rust-coverage:
     name: Rust coverage

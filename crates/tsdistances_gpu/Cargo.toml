@@ -9,7 +9,10 @@ edition = "2024"
 exclude = ["tests/ACSF1/*"]
 
 [lib]
-crate-type = ["dylib", "rlib"]
+# `dylib` used to be mandatory for shader crates; rust-gpu PR#477 removed that
+# requirement. The root `tsdistances` package consumes the `rlib`, and dropping the
+# `dylib` avoids building and linking a second copy of the crate on every build.
+crate-type = ["rlib"]
 
 [[bench]]
 name = "benchmark"

@@ -205,7 +205,15 @@ static DEVICE_CORE: LazyLock<CachedCore> = LazyLock::new(|| {
             ..Default::default()
         },
     )
-    .unwrap();
+    // The bare `unwrap()` here reported "the requested version of Vulkan is not supported
+    // by the driver", which sounds like a driver-too-old problem but is what the loader
+    // returns when it finds *no* ICD at all -- including when `VK_ICD_FILENAMES` points at
+    // a path that does not exist. Say so, since that is the common cause.
+    .expect(
+        "could not create a Vulkan instance. The loader found no usable driver (ICD). \
+         Check that a Vulkan driver is installed, and that VK_ICD_FILENAMES / VK_DRIVER_FILES, \
+         if set, point at a file that exists. `vulkaninfo --summary` should list a device.",
+    );
 
     let device_extensions = DeviceExtensions::empty();
 
@@ -232,11 +240,12 @@ static DEVICE_CORE: LazyLock<CachedCore> = LazyLock::new(|| {
         physical_device,
         DeviceCreateInfo {
             enabled_extensions: device_extensions,
-            enabled_features: DeviceFeatures {
-                shader_int8: true,
-                shader_int64: true,
-                ..Default::default()
-            },
+            // No `shader_int64` / `shader_int8`. The kernels' constants block used to be
+            // 64-bit, which made the shader declare `OpCapability Int64` and so required
+            // the matching device feature -- one MoltenVK/Metal does not expose, meaning
+            // this crate could not open a device on Apple at all. `Int8` was never even
+            // declared by the emitted module; it was requested and paid for regardless.
+            enabled_features: DeviceFeatures::default(),
             queue_create_infos: vec![QueueCreateInfo {
                 queue_family_index,
                 ..Default::default()
@@ -440,4 +449,40 @@ pub fn compute_optimized_diag_len(len: usize, max_subgroup_size: usize) -> usize
 #[inline]
 pub fn next_multiple_of_n(x: usize, n: usize) -> usize {
     x.div_ceil(n) * n
+}
+
+/// Width of one diamond tile, in invocations.
+///
+/// Reads `subgroup_size` (`VkPhysicalDeviceVulkan11Properties`, i.e. Vulkan 1.1) in
+/// preference to `max_subgroup_size` (`VkPhysicalDeviceVulkan13Properties`). The value
+/// is only ever used as a tile width -- the diamond barrier is workgroup-scoped, so it
+/// need not match any hardware subgroup -- and the 1.3 property is `None` on older
+/// devices, where the previous `.unwrap()` panicked outright instead of degrading. The
+/// two agree on every driver checked (RADV 64/64, lavapipe 8/8).
+pub fn compute_tile_width(device: &Device) -> usize {
+    let properties = device.physical_device().properties();
+    properties
+        .subgroup_size
+        .or(properties.max_subgroup_size)
+        .unwrap_or(32) as usize
+}
+
+/// Workgroup size to dispatch kernels with, for a given diamond tile width.
+///
+/// `shader_load::load` patches this into the shader's `LocalSize` execution mode and the
+/// `dispatch` in `kernels.rs` divides the thread count by it to get the workgroup count.
+/// Those two numbers MUST agree, which is why there is exactly one definition of it.
+///
+/// **Exactly one diamond per workgroup.** This used to be
+/// `max_compute_work_group_size[0]` (1024), packing 16 independent diamonds into one
+/// workgroup. That is not merely wasteful -- the kernel's barrier has Workgroup execution
+/// scope, and the loop it sits in runs for `diag_count` iterations, which differs between
+/// diamonds. Invocations belonging to different diamonds therefore reached different
+/// numbers of barriers: undefined behaviour, which AMD tolerated and lavapipe did not.
+///
+/// One diamond per workgroup makes `diag_count` (and the `active` flag) uniform across
+/// every invocation that shares a barrier, which is what makes the tight loop bound in
+/// `warp_kernel_inner` legal. It also lets a diamond map onto a single hardware subgroup.
+pub fn compute_workgroup_size(_device: &Device, tile_width: usize) -> u32 {
+    u32::try_from(tile_width).expect("tile width must fit in u32")
 }

@@ -10,6 +10,8 @@ pub mod kernels;
 #[cfg(not(target_arch = "spirv"))]
 mod shader_load;
 #[cfg(not(target_arch = "spirv"))]
+pub use shader_load::SHADER_CODE;
+#[cfg(not(target_arch = "spirv"))]
 pub mod timing;
 #[cfg(not(target_arch = "spirv"))]
 pub mod utils;

@@ -102,8 +102,12 @@ fn test_lcss_distance() {
 
 #[test]
 fn test_dtw_distance() {
-    let train_data: Vec<Vec<f32>> = read_txt("../../DATA/ucr/Wafer/Wafer_TRAIN.tsv").unwrap();
-    let test_data: Vec<Vec<f32>> = read_txt("../../DATA/ucr/Wafer/Wafer_TEST.tsv").unwrap();
+    // Was `../../DATA/ucr/Wafer/*.tsv`, a path outside the repository that has never
+    // existed here -- so this test, alone among the seven in this file, failed on a
+    // missing file and never exercised the DTW kernel at all. Same fixture as its
+    // siblings.
+    let train_data: Vec<Vec<f32>> = read_txt("tests/ACSF1/ACSF1_TRAIN.csv").unwrap();
+    let test_data: Vec<Vec<f32>> = read_txt("tests/ACSF1/ACSF1_TEST.csv").unwrap();
 
     let start_time = std::time::Instant::now();
     let (device, queue, sba, sda, ma) = get_device();

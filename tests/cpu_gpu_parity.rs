@@ -1,0 +1,194 @@
+//! The GPU backend must agree with this library's own CPU backend.
+//!
+//! This is the test that was missing. The GPU crate's own suite only checked that the
+//! diagonal of a self-distance matrix is ~0 and explicitly excused CPU/GPU disagreement as
+//! "different boundary conditions" -- so several independent wrong-answer bugs sat in the
+//! wavefront untouched: the series were zero-padded to a multiple of the subgroup width
+//! and the DP was run over the padding; the dispatch schedule (`rows_count`) assumed
+//! tile-aligned lengths; the result matrix came back transposed whenever the inputs were
+//! swapped; excess invocations wrote past the end of the diagonal buffer; and MSM's cost
+//! function had a typo that the reference implementation shared.
+//!
+//! Every case here failed before those fixes. Lengths are deliberately *not* all multiples
+//! of 64: the padding bug was invisible at exactly the sizes a benchmark would pick.
+//!
+//! Run against a second driver too -- the barrier and thread-guard bugs only reproduced at
+//! a small subgroup width:
+//!   VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json cargo test ...
+
+use tsdistances::core;
+
+/// GPU is f32, CPU is f64, so exact agreement is not expected. 1e-5 relative is orders of
+/// magnitude tighter than any of the bugs above and comfortably looser than f32 rounding.
+const TOL: f64 = 1e-5;
+
+fn make_series(num: usize, len: usize, seed: u64) -> Vec<Vec<f64>> {
+    let mut s = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+    let mut next = move || {
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((s >> 33) as f64 / (1u64 << 31) as f64) * 4.0 - 2.0
+    };
+    (0..num)
+        .map(|_| (0..len).map(|_| next()).collect())
+        .collect()
+}
+
+/// Worst relative difference, or `INFINITY` if either side has a non-finite entry or the
+/// two matrices disagree on shape.
+fn worst(gpu: &[Vec<f64>], cpu: &[Vec<f64>]) -> f64 {
+    if gpu.len() != cpu.len() || gpu[0].len() != cpu[0].len() {
+        return f64::INFINITY;
+    }
+    let mut w: f64 = 0.0;
+    for (rg, rc) in gpu.iter().zip(cpu) {
+        for (x, y) in rg.iter().zip(rc) {
+            if !x.is_finite() || !y.is_finite() {
+                return f64::INFINITY;
+            }
+            w = w.max((x - y).abs() / y.abs().max(1.0));
+        }
+    }
+    w
+}
+
+fn check(name: &str, shape: &str, gpu: &[Vec<f64>], cpu: &[Vec<f64>]) {
+    let e = worst(gpu, cpu);
+    assert!(
+        e < TOL,
+        "{name} @ {shape}: gpu backend disagrees with cpu backend by {e:e} (tol {TOL:e}); \
+         gpu is {}x{}, cpu is {}x{}",
+        gpu.len(),
+        gpu[0].len(),
+        cpu.len(),
+        cpu[0].len()
+    );
+}
+
+/// All seven distances, across lengths that straddle the subgroup width in both
+/// directions. `63/65/96/129` are the cases the zero-padding silently corrupted; `16/32`
+/// are shorter than one tile, which used to dispatch no work at all.
+#[test]
+fn gpu_matches_cpu_across_lengths() {
+    for &len in &[16usize, 32, 63, 64, 65, 96, 128, 129, 192, 256] {
+        let x = make_series(3, len, 1);
+        let y = make_series(3, len, 2);
+        let (p, q) = (x.as_slice(), Some(y.as_slice()));
+        let s = &format!("len {len}");
+
+        check(
+            "DTW",
+            s,
+            &core::dtw(p, q, 1.0, false, "gpu").unwrap(),
+            &core::dtw(p, q, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "ERP",
+            s,
+            &core::erp(p, q, 1.0, 0.0, false, "gpu").unwrap(),
+            &core::erp(p, q, 1.0, 0.0, false, "cpu").unwrap(),
+        );
+        check(
+            "LCSS",
+            s,
+            &core::lcss(p, q, 1.0, 1.0, false, "gpu").unwrap(),
+            &core::lcss(p, q, 1.0, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "MSM",
+            s,
+            &core::msm(p, q, 1.0, false, "gpu").unwrap(),
+            &core::msm(p, q, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "TWE",
+            s,
+            &core::twe(p, q, 1.0, 0.001, 1.0, false, "gpu").unwrap(),
+            &core::twe(p, q, 1.0, 0.001, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "WDTW",
+            s,
+            &core::wdtw(p, q, 1.0, 0.05, false, "gpu").unwrap(),
+            &core::wdtw(p, q, 1.0, 0.05, false, "cpu").unwrap(),
+        );
+        check(
+            "ADTW",
+            s,
+            &core::adtw(p, q, 1.0, 0.1, false, "gpu").unwrap(),
+            &core::adtw(p, q, 1.0, 0.1, false, "cpu").unwrap(),
+        );
+    }
+}
+
+/// Shapes rather than lengths: unequal series counts, unequal series lengths, and enough
+/// pairs to cross the `a_chunk`/`b_chunk` tiling. The `128/64` rows are the ones that came
+/// back transposed -- with the wrong dimensions when the counts also differed.
+#[test]
+fn gpu_matches_cpu_across_shapes() {
+    // (count_a, count_b, len_a, len_b)
+    let cases: &[(usize, usize, usize, usize)] = &[
+        (3, 3, 64, 64),
+        (3, 3, 64, 128),
+        (3, 3, 128, 64),
+        (3, 4, 128, 64),
+        (4, 3, 64, 128),
+        (1, 1, 64, 64),
+        (1, 7, 64, 64),
+        (7, 1, 64, 64),
+        (40, 40, 64, 64),
+        (3, 3, 100, 37),
+    ];
+    for &(na, nb, la, lb) in cases {
+        let x = make_series(na, la, 1);
+        let y = make_series(nb, lb, 2);
+        let (p, q) = (x.as_slice(), Some(y.as_slice()));
+        let s = &format!("{na}x{nb} series, len {la}/{lb}");
+
+        check(
+            "DTW",
+            s,
+            &core::dtw(p, q, 1.0, false, "gpu").unwrap(),
+            &core::dtw(p, q, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "MSM",
+            s,
+            &core::msm(p, q, 1.0, false, "gpu").unwrap(),
+            &core::msm(p, q, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "LCSS",
+            s,
+            &core::lcss(p, q, 1.0, 1.0, false, "gpu").unwrap(),
+            &core::lcss(p, q, 1.0, 1.0, false, "cpu").unwrap(),
+        );
+    }
+}
+
+/// A self-distance matrix must be symmetric with a zero diagonal. Independent of the CPU
+/// backend, so this still holds where the CPU backend's own upper-bound pruning gives up
+/// (`diagonal.rs` returns `inf` for MSM/TWE once the two lengths differ by 3x or more).
+#[test]
+fn gpu_self_distance_is_symmetric_with_zero_diagonal() {
+    for &len in &[37usize, 64, 100] {
+        let x = make_series(5, len, 7);
+        let p = x.as_slice();
+        let d = core::dtw(p, None, 1.0, false, "gpu").unwrap();
+        for (i, row) in d.iter().enumerate() {
+            assert!(
+                row[i].abs() < 1e-4,
+                "len {len}: dtw self-distance [{i}][{i}] = {}, expected ~0",
+                row[i]
+            );
+            for (j, &value) in row.iter().enumerate() {
+                let mirrored = d[j][i];
+                assert!(
+                    (value - mirrored).abs() < 1e-4 * value.abs().max(1.0),
+                    "len {len}: dtw matrix not symmetric at [{i}][{j}]: {value} vs {mirrored}"
+                );
+            }
+        }
+    }
+}

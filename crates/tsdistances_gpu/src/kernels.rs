@@ -516,6 +516,165 @@ pub mod kernel_trait {
     }
 }
 
+/// Host side of [`init_diagonal`] and [`gather_results`].
+#[cfg(not(target_arch = "spirv"))]
+pub mod pairwise {
+    use super::PairwiseConstants;
+    use std::sync::Arc;
+    use vulkano::buffer::Subbuffer;
+    use vulkano::command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer};
+    use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
+    use vulkano::descriptor_set::{DescriptorSet, WriteDescriptorSet};
+    use vulkano::device::Device;
+    use vulkano::pipeline::{Pipeline, PipelineBindPoint};
+
+    fn record(
+        device: Arc<Device>,
+        dsa: Arc<StandardDescriptorSetAllocator>,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        entry_point: &'static str,
+        writes: impl IntoIterator<Item = WriteDescriptorSet>,
+        constants: PairwiseConstants,
+        pair_count: u32,
+        workgroup_size: u32,
+    ) {
+        let pipeline =
+            crate::shader_load::get_shader_entry_pipeline(device, entry_point, workgroup_size);
+        let layout = &pipeline.layout().set_layouts()[0];
+        let set = DescriptorSet::new(dsa, layout.clone(), writes, []).unwrap();
+
+        builder
+            .bind_pipeline_compute(pipeline.clone())
+            .unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Compute,
+                pipeline.layout().clone(),
+                0,
+                set,
+            )
+            .unwrap()
+            .push_constants(pipeline.layout().clone(), 0, constants)
+            .unwrap();
+
+        unsafe { builder.dispatch([pair_count.div_ceil(workgroup_size), 1, 1]) }.unwrap();
+    }
+
+    /// Seed every pair's origin cell to 0, after a `fill_buffer` has laid down `init_val`.
+    pub fn init_diagonal(
+        device: Arc<Device>,
+        dsa: Arc<StandardDescriptorSetAllocator>,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        diagonal: &Subbuffer<[f32]>,
+        pair_count: u32,
+        diag_len: u32,
+        workgroup_size: u32,
+    ) {
+        record(
+            device,
+            dsa,
+            builder,
+            "kernels::init_diagonal",
+            [WriteDescriptorSet::buffer(0, diagonal.clone())],
+            PairwiseConstants {
+                pair_count,
+                diag_len,
+                cell_index: 0,
+            },
+            pair_count,
+            workgroup_size,
+        );
+    }
+
+    /// Collect each pair's answer cell into `results`, so only that is read back.
+    pub fn gather_results(
+        device: Arc<Device>,
+        dsa: Arc<StandardDescriptorSetAllocator>,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        diagonal: &Subbuffer<[f32]>,
+        results: &Subbuffer<[f32]>,
+        pair_count: u32,
+        diag_len: u32,
+        cell_index: u32,
+        workgroup_size: u32,
+    ) {
+        record(
+            device,
+            dsa,
+            builder,
+            "kernels::gather_results",
+            [
+                WriteDescriptorSet::buffer(0, diagonal.clone()),
+                WriteDescriptorSet::buffer(1, results.clone()),
+            ],
+            PairwiseConstants {
+                pair_count,
+                diag_len,
+                cell_index,
+            },
+            pair_count,
+            workgroup_size,
+        );
+    }
+}
+
+/// Push constants for [`init_diagonal`] and [`gather_results`].
+///
+/// Both walk the diagonal buffer one pair at a time, so they need the same geometry:
+/// how many pairs there are and how far apart their slices sit.
+#[derive(Clone, Copy, bytemuck::AnyBitPattern)]
+#[repr(C)]
+#[allow(unused)]
+pub struct PairwiseConstants {
+    pair_count: u32,
+    diag_len: u32,
+    /// Offset *within* a pair's slice. Unused by `init_diagonal` (which always seeds
+    /// index 0); for `gather_results` it is the answer cell, `(b_len - a_len) & mask`.
+    cell_index: u32,
+}
+
+// The `warp_kernel_spec!` expansions each import this inside their own module; the two
+// entry points below live at the top level and need it here.
+#[cfg(target_arch = "spirv")]
+use spirv_std::spirv;
+
+/// Seed each pair's origin cell to 0.
+///
+/// The rest of the diagonal buffer is filled with `init_val` by `vkCmdFillBuffer`, which
+/// writes one repeating 32-bit pattern and so cannot place these strided zeros. Doing the
+/// whole initialisation on the host instead meant memset-ing 163.8 MB and copying it
+/// across the bus on every chunk -- 159 ms of the 2.35 s ACSF1 run, all of it avoidable.
+#[cfg(target_arch = "spirv")]
+#[spirv(compute(threads(1)))]
+pub fn init_diagonal(
+    #[spirv(global_invocation_id)] global_id: spirv_std::glam::UVec3,
+    #[spirv(push_constant)] constants: &PairwiseConstants,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] diagonal: &mut [f32],
+) {
+    let pair = global_id.x;
+    if pair < constants.pair_count {
+        diagonal[(pair * constants.diag_len) as usize] = 0.0;
+    }
+}
+
+/// Copy each pair's answer cell into a compact `pair_count`-element buffer.
+///
+/// Without this the host copied the *entire* diagonal buffer back to read one float per
+/// pair -- 163.8 MB moved to extract 40 KB on the ACSF1 run, a ~4000:1 ratio.
+#[cfg(target_arch = "spirv")]
+#[spirv(compute(threads(1)))]
+pub fn gather_results(
+    #[spirv(global_invocation_id)] global_id: spirv_std::glam::UVec3,
+    #[spirv(push_constant)] constants: &PairwiseConstants,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] diagonal: &[f32],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] results: &mut [f32],
+) {
+    let pair = global_id.x;
+    if pair < constants.pair_count {
+        results[pair as usize] =
+            diagonal[(pair * constants.diag_len + constants.cell_index) as usize];
+    }
+}
+
 #[inline(always)]
 fn min(a: f32, b: f32) -> f32 {
     if a < b { a } else { b }

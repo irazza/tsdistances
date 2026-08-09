@@ -71,6 +71,19 @@ impl SubBuffersAllocator {
         }
     }
 
+    /// Allocate a device-local buffer with no host mirror.
+    ///
+    /// [`SubBufferPair`] always allocates a host-visible twin, which is right for data
+    /// that crosses the bus but pure waste for the diagonal buffer: it is written and read
+    /// only by the GPU (filled with `fill_buffer`, seeded and harvested by
+    /// `kernels::init_diagonal` / `kernels::gather_results`), and on the ACSF1 workload its
+    /// twin alone was 163.8 MB of host memory that nothing ever touched.
+    pub fn allocate_gpu<T: BufferContents>(&self, length: u64) -> Subbuffer<[T]> {
+        self.gpu
+            .allocate_slice(length)
+            .expect("failed to allocate device-local buffer")
+    }
+
     /// Ensure the allocator has at least the specified capacity.
     /// Pre-allocate with extra headroom to reduce future resizes.
     pub fn ensure_capacity(&self, required_size: u64) {
@@ -240,6 +253,12 @@ impl<T: BufferContents + Copy> SubBufferPair<T> {
 impl<T: BufferContents + Copy> SubBufferPair<T> {
     pub fn get_cpu_buffer(&self) -> BufferWriteGuard<'_, [T]> {
         self.cpu.write().unwrap()
+    }
+
+    /// The device-local half, for kernels that write it directly rather than receiving it
+    /// from a host copy.
+    pub fn gpu_buffer(&self) -> Subbuffer<[T]> {
+        self.gpu.clone()
     }
 
     pub fn move_gpu<L>(

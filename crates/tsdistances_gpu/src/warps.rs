@@ -9,6 +9,7 @@ use crate::{
 };
 use std::cmp::max;
 use vulkano::{
+    buffer::Subbuffer,
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, allocator::StandardCommandBufferAllocator,
     },
@@ -36,7 +37,11 @@ fn flatten_and_pad(a: &Vec<Vec<f32>>, pad: usize) -> Vec<f32> {
 pub struct DiamondPartitioning<G: GpuKernelImpl> {
     a_buffer: SubBufferPair<f32>,
     b_buffer: SubBufferPair<f32>,
-    diagonal_buffer: SubBufferPair<f32>,
+    /// Device-local only: the GPU fills, seeds, works in and harvests this buffer without
+    /// the host ever reading or writing it. See `SubBuffersAllocator::allocate_gpu`.
+    diagonal_buffer: Subbuffer<[f32]>,
+    /// One answer per pair -- the only thing that comes back across the bus.
+    results_buffer: SubBufferPair<f32>,
     kernel_params: Option<G::KernelParams>,
     /// Cached command buffer pool for reuse
     command_pool: Option<CommandBufferPool>,
@@ -158,33 +163,6 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
 }
 
 impl<G: GpuKernelImpl> DiamondPartitioning<G> {
-    pub fn new(
-        subbuffer_allocator: SubBuffersAllocator,
-        a_count: u64,
-        b_count: u64,
-        a_padded_len: u64,
-        b_padded_len: u64,
-        diag_len: u64,
-    ) -> Self {
-        let a_buffer_size = a_count * a_padded_len;
-        let b_buffer_size = b_count * b_padded_len;
-        let diagonal_buffer_size = a_count * b_count * diag_len;
-
-        // Use ensure_capacity to reduce reallocations
-        subbuffer_allocator.ensure_capacity(
-            (a_buffer_size + b_buffer_size + diagonal_buffer_size) * size_of::<f32>() as u64,
-        );
-
-        Self {
-            a_buffer: SubBufferPair::new(&subbuffer_allocator, a_buffer_size),
-            b_buffer: SubBufferPair::new(&subbuffer_allocator, b_buffer_size),
-            diagonal_buffer: SubBufferPair::new(&subbuffer_allocator, diagonal_buffer_size),
-            kernel_params: None,
-            command_pool: None,
-        }
-    }
-
-    /// Create with a pre-initialized command buffer pool for better reuse
     pub fn new_with_pool(
         subbuffer_allocator: SubBuffersAllocator,
         a_count: u64,
@@ -197,16 +175,19 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
         let a_buffer_size = a_count * a_padded_len;
         let b_buffer_size = b_count * b_padded_len;
         let diagonal_buffer_size = a_count * b_count * diag_len;
+        let results_buffer_size = a_count * b_count;
 
         // Use ensure_capacity to reduce reallocations
         subbuffer_allocator.ensure_capacity(
-            (a_buffer_size + b_buffer_size + diagonal_buffer_size) * size_of::<f32>() as u64,
+            (a_buffer_size + b_buffer_size + diagonal_buffer_size + results_buffer_size)
+                * size_of::<f32>() as u64,
         );
 
         Self {
             a_buffer: SubBufferPair::new(&subbuffer_allocator, a_buffer_size),
             b_buffer: SubBufferPair::new(&subbuffer_allocator, b_buffer_size),
-            diagonal_buffer: SubBufferPair::new(&subbuffer_allocator, diagonal_buffer_size),
+            diagonal_buffer: subbuffer_allocator.allocate_gpu(diagonal_buffer_size),
+            results_buffer: SubBufferPair::new(&subbuffer_allocator, results_buffer_size),
             kernel_params: None,
             command_pool: Some(command_pool),
         }
@@ -237,22 +218,8 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
         // Use optimized diagonal length calculation
         let diag_len = compute_optimized_diag_len(max(a_len, b_len), max_subgroup_threads);
 
-        let mut diagonal_buffer_cpu = self.diagonal_buffer.get_cpu_buffer();
         let diagonal_size = a_count * b_count * diag_len;
-
-        // Optimized initialization - use chunks for better cache utilization
-        let chunk_init_size = diag_len;
-        for chunk_start in (0..diagonal_size).step_by(chunk_init_size) {
-            let chunk_end = (chunk_start + chunk_init_size).min(diagonal_size);
-            diagonal_buffer_cpu[chunk_start..chunk_end].fill(init_val);
-        }
-
-        // Set initial diagonal values
-        for i in 0..(a_count * b_count) {
-            diagonal_buffer_cpu[i * diag_len] = 0.0;
-        }
-
-        drop(diagonal_buffer_cpu);
+        let pair_count = a_count * b_count;
 
         let n_tiles_in_a = a_len.div_ceil(max_subgroup_threads);
         let n_tiles_in_b = b_len.div_ceil(max_subgroup_threads);
@@ -293,7 +260,29 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
 
         let a_gpu = self.a_buffer.move_gpu_data(a_padded, &mut builder);
         let b_gpu = self.b_buffer.move_gpu_data(b_padded, &mut builder);
-        let mut diagonal_buffer_gpu = self.diagonal_buffer.move_gpu(&mut builder, diagonal_size);
+
+        // Initialise the diagonal entirely on the device. `fill_buffer` lays down
+        // `init_val` as one repeating 32-bit pattern -- which is why the per-pair origin
+        // cells, being strided, need the `init_diagonal` kernel to seed them afterwards.
+        // Doing this on the host instead meant memset-ing the whole buffer and copying it
+        // across the bus for every chunk (163.8 MB / 159 ms on the ACSF1 workload).
+        let workgroup_size = crate::utils::compute_workgroup_size(&device, max_subgroup_threads);
+        let mut diagonal_buffer_gpu = self.diagonal_buffer.clone().slice(0..diagonal_size as u64);
+        builder
+            .fill_buffer(
+                diagonal_buffer_gpu.clone().reinterpret::<[u32]>(),
+                init_val.to_bits(),
+            )
+            .unwrap();
+        crate::kernels::pairwise::init_diagonal(
+            device.clone(),
+            descriptor_set_allocator.clone(),
+            &mut builder,
+            &diagonal_buffer_gpu,
+            pair_count as u32,
+            diag_len as u32,
+            workgroup_size,
+        );
 
         // Number of kernel calls
         for i in 0..rows_count {
@@ -336,8 +325,24 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
         }
 
         let (_, cx) = index_mat_to_diag(a_len, b_len);
+        let answer_index = (cx as usize) & (diag_len - 1);
 
-        let diagonal = self.diagonal_buffer.move_cpu(&mut builder);
+        // Harvest one float per pair on the device and read back only that. Copying the
+        // whole diagonal buffer to the host moved 163.8 MB to extract 40 KB on the ACSF1
+        // workload -- roughly 4000 bytes transferred per byte actually used.
+        crate::kernels::pairwise::gather_results(
+            device.clone(),
+            descriptor_set_allocator.clone(),
+            &mut builder,
+            &diagonal_buffer_gpu,
+            &self.results_buffer.gpu_buffer(),
+            pair_count as u32,
+            diag_len as u32,
+            answer_index as u32,
+            workgroup_size,
+        );
+        let results = self.results_buffer.move_cpu(&mut builder);
+
         let command_buffer = builder.build().unwrap();
         let future = vulkano::sync::now(device)
             .then_execute(queue, command_buffer)
@@ -345,12 +350,11 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
             .then_signal_fence_and_flush()
             .unwrap();
         future.wait(None).unwrap();
-        let diagonal = diagonal.read().unwrap();
+
+        let results = results.read().unwrap();
         for i in 0..a_count {
             for j in 0..b_count {
-                let diag_offset = (i * b_count + j) * diag_len;
-                dist_matrix[i][column_offset + j] =
-                    diagonal[diag_offset + ((cx as usize) & (diag_len - 1))];
+                dist_matrix[i][column_offset + j] = results[i * b_count + j];
             }
         }
     }

@@ -32,6 +32,10 @@ const EXPECTED_ENTRY_POINTS: &[&str] = &[
     "kernels::adtw_distance::batch_call",
     "kernels::dtw_distance::batch_call",
     "kernels::erp_distance::batch_call",
+    // Not distances: these initialise the diagonal buffer and harvest one answer per pair
+    // on the device, so neither has to cross the bus. See `kernels::pairwise`.
+    "kernels::gather_results",
+    "kernels::init_diagonal",
     "kernels::lcss_distance::batch_call",
     "kernels::msm_distance::batch_call",
     "kernels::twe_distance::batch_call",

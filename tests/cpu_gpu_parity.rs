@@ -279,6 +279,119 @@ fn gpu_honours_sakoe_chiba_band() {
     }
 }
 
+/// Every per-distance parameter, not just the shape of the input.
+///
+/// The band bug (see above) existed because every parity case varied lengths, counts and
+/// ratios, and none varied a *parameter* -- so a parameter the GPU ignored outright went
+/// unnoticed. This covers the rest of them: `gap_penalty`, `epsilon`, `g`, `warp_penalty`,
+/// `stiffness`, `penalty`, and `par`.
+///
+/// Each block also asserts the parameter *changes* the GPU result, for the same reason as
+/// the band test: parity is vacuous if both backends ignore the knob.
+#[test]
+fn gpu_honours_every_distance_parameter() {
+    let len = 96;
+    let x = make_series(2, len, 1);
+    let y = make_series(2, len, 2);
+    let (p, q) = (x.as_slice(), Some(y.as_slice()));
+
+    let changes = |a: &[Vec<f64>], b: &[Vec<f64>], what: &str| {
+        assert!(
+            (a[0][0] - b[0][0]).abs() > 1e-6,
+            "{what} did not change the GPU result ({} vs {}), so it is being ignored",
+            a[0][0],
+            b[0][0]
+        );
+    };
+
+    for gap in [0.0f64, 0.25, 1.0, 3.0] {
+        check(
+            "ERP",
+            &format!("gap_penalty {gap}"),
+            &core::erp(p, q, 1.0, gap, false, "gpu").unwrap(),
+            &core::erp(p, q, 1.0, gap, false, "cpu").unwrap(),
+        );
+    }
+    changes(
+        &core::erp(p, q, 1.0, 0.0, false, "gpu").unwrap(),
+        &core::erp(p, q, 1.0, 3.0, false, "gpu").unwrap(),
+        "erp gap_penalty",
+    );
+
+    for eps in [0.0f64, 0.1, 0.5, 1.0, 3.0] {
+        check(
+            "LCSS",
+            &format!("epsilon {eps}"),
+            &core::lcss(p, q, 1.0, eps, false, "gpu").unwrap(),
+            &core::lcss(p, q, 1.0, eps, false, "cpu").unwrap(),
+        );
+    }
+    changes(
+        &core::lcss(p, q, 1.0, 0.0, false, "gpu").unwrap(),
+        &core::lcss(p, q, 1.0, 3.0, false, "gpu").unwrap(),
+        "lcss epsilon",
+    );
+
+    for g in [0.0f64, 0.01, 0.05, 0.25, 1.0] {
+        check(
+            "WDTW",
+            &format!("g {g}"),
+            &core::wdtw(p, q, 1.0, g, false, "gpu").unwrap(),
+            &core::wdtw(p, q, 1.0, g, false, "cpu").unwrap(),
+        );
+    }
+    changes(
+        &core::wdtw(p, q, 1.0, 0.0, false, "gpu").unwrap(),
+        &core::wdtw(p, q, 1.0, 0.25, false, "gpu").unwrap(),
+        "wdtw g",
+    );
+
+    for w in [0.0f64, 0.1, 1.0, 10.0] {
+        check(
+            "ADTW",
+            &format!("warp_penalty {w}"),
+            &core::adtw(p, q, 1.0, w, false, "gpu").unwrap(),
+            &core::adtw(p, q, 1.0, w, false, "cpu").unwrap(),
+        );
+    }
+    changes(
+        &core::adtw(p, q, 1.0, 0.0, false, "gpu").unwrap(),
+        &core::adtw(p, q, 1.0, 10.0, false, "gpu").unwrap(),
+        "adtw warp_penalty",
+    );
+
+    for stiffness in [0.0f64, 0.001, 0.1, 1.0] {
+        for penalty in [0.0f64, 1.0] {
+            check(
+                "TWE",
+                &format!("stiffness {stiffness}, penalty {penalty}"),
+                &core::twe(p, q, 1.0, stiffness, penalty, false, "gpu").unwrap(),
+                &core::twe(p, q, 1.0, stiffness, penalty, false, "cpu").unwrap(),
+            );
+        }
+    }
+    changes(
+        &core::twe(p, q, 1.0, 0.0, 0.0, false, "gpu").unwrap(),
+        &core::twe(p, q, 1.0, 1.0, 0.0, false, "gpu").unwrap(),
+        "twe stiffness",
+    );
+    changes(
+        &core::twe(p, q, 1.0, 0.0, 0.0, false, "gpu").unwrap(),
+        &core::twe(p, q, 1.0, 0.0, 1.0, false, "gpu").unwrap(),
+        "twe penalty",
+    );
+
+    // `par` selects the host-side threading strategy and must not alter any result.
+    for par in [false, true] {
+        check(
+            "DTW",
+            &format!("par {par}"),
+            &core::dtw(p, q, 1.0, par, "gpu").unwrap(),
+            &core::dtw(p, q, 1.0, par, "cpu").unwrap(),
+        );
+    }
+}
+
 /// Exactly one diamond per workgroup. This is a correctness invariant, not a tuning knob.
 ///
 /// The wavefront barrier has Workgroup *execution* scope and sits inside a loop whose trip

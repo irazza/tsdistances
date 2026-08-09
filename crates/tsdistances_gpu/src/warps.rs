@@ -57,6 +57,8 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
     a: &Vec<Vec<f32>>,
     b: &Vec<Vec<f32>>,
     init_val: f32,
+    // Sakoe-Chiba band as a fraction of `a_len`; `>= 1.0` means unconstrained.
+    band: f32,
 ) -> Vec<Vec<f32>> {
     // The wavefront requires the shorter series on the `a` axis, so the inputs are swapped
     // when `a` is the larger. Everything below then works in swapped orientation and
@@ -140,6 +142,7 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
                 a_end - a_start,
                 b_end - b_start,
                 init_val,
+                band,
                 &mut dist_matrix[a_start..a_end],
                 b_start,
             );
@@ -212,6 +215,7 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
         a_count: usize,
         b_count: usize,
         init_val: f32,
+        band: f32,
         dist_matrix: &mut [Vec<f32>],
         column_offset: usize,
     ) {
@@ -300,6 +304,8 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
                 a_stride as u64,
                 b_stride as u64,
                 max_subgroup_threads as u64,
+                band,
+                init_val,
                 &a_gpu,
                 &b_gpu,
                 &mut diagonal_buffer_gpu,

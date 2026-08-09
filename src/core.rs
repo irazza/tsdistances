@@ -337,6 +337,7 @@ pub fn erp<R: AsRef<[f64]> + Sync>(
                             ma.clone(),
                             a,
                             b,
+                            sakoe_chiba_band as f32,
                             gap_penalty as f32,
                         )
                     },
@@ -421,6 +422,7 @@ pub fn lcss<R: AsRef<[f64]> + Sync>(
                             ma.clone(),
                             a,
                             b,
+                            sakoe_chiba_band as f32,
                             epsilon as f32,
                         )
                     },
@@ -478,6 +480,7 @@ pub fn dtw<R: AsRef<[f64]> + Sync>(
                             ma.clone(),
                             a,
                             b,
+                            sakoe_chiba_band as f32,
                         )
                     },
                     x1,
@@ -579,6 +582,7 @@ pub fn wdtw<R: AsRef<[f64]> + Sync>(
                             ma.clone(),
                             a,
                             b,
+                            sakoe_chiba_band as f32,
                             &weights.iter().map(|x| *x as f32).collect::<Vec<_>>(),
                         )
                     },
@@ -673,6 +677,7 @@ pub fn adtw<R: AsRef<[f64]> + Sync>(
                             ma.clone(),
                             a,
                             b,
+                            sakoe_chiba_band as f32,
                             warp_penalty as f32,
                         )
                     },
@@ -768,6 +773,7 @@ pub fn msm<R: AsRef<[f64]> + Sync>(
                             ma.clone(),
                             a,
                             b,
+                            sakoe_chiba_band as f32,
                         )
                     },
                     x1,
@@ -871,6 +877,7 @@ pub fn twe<R: AsRef<[f64]> + Sync>(
                             ma.clone(),
                             a,
                             b,
+                            sakoe_chiba_band as f32,
                             stiffness as f32,
                             penalty as f32,
                         )

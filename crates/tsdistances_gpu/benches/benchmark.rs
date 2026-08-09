@@ -58,7 +58,7 @@ fn bench_dtw(c: &mut Criterion) {
             |b, (train, test)| {
                 b.iter(|| {
                     let (device, queue, sba, sda, ma) = get_device();
-                    black_box(dtw(device, queue, sba, sda, ma, train, test))
+                    black_box(dtw(device, queue, sba, sda, ma, train, test, 1.0))
                 });
             },
         );
@@ -88,7 +88,7 @@ fn bench_erp(c: &mut Criterion) {
             |b, (train, test, gap)| {
                 b.iter(|| {
                     let (device, queue, sba, sda, ma) = get_device();
-                    black_box(erp(device, queue, sba, sda, ma, train, test, *gap))
+                    black_box(erp(device, queue, sba, sda, ma, train, test, 1.0, *gap))
                 });
             },
         );
@@ -118,7 +118,7 @@ fn bench_lcss(c: &mut Criterion) {
             |b, (train, test, eps)| {
                 b.iter(|| {
                     let (device, queue, sba, sda, ma) = get_device();
-                    black_box(lcss(device, queue, sba, sda, ma, train, test, *eps))
+                    black_box(lcss(device, queue, sba, sda, ma, train, test, 1.0, *eps))
                 });
             },
         );
@@ -146,7 +146,7 @@ fn bench_msm(c: &mut Criterion) {
             |b, (train, test)| {
                 b.iter(|| {
                     let (device, queue, sba, sda, ma) = get_device();
-                    black_box(msm(device, queue, sba, sda, ma, train, test))
+                    black_box(msm(device, queue, sba, sda, ma, train, test, 1.0))
                 });
             },
         );
@@ -177,7 +177,9 @@ fn bench_twe(c: &mut Criterion) {
             |b, (train, test, stiff, pen)| {
                 b.iter(|| {
                     let (device, queue, sba, sda, ma) = get_device();
-                    black_box(twe(device, queue, sba, sda, ma, train, test, *stiff, *pen))
+                    black_box(twe(
+                        device, queue, sba, sda, ma, train, test, 1.0, *stiff, *pen,
+                    ))
                 });
             },
         );
@@ -206,7 +208,7 @@ fn bench_wdtw(c: &mut Criterion) {
             |b, (train, test, w)| {
                 b.iter(|| {
                     let (device, queue, sba, sda, ma) = get_device();
-                    black_box(wdtw(device, queue, sba, sda, ma, train, test, w))
+                    black_box(wdtw(device, queue, sba, sda, ma, train, test, 1.0, w))
                 });
             },
         );
@@ -236,7 +238,7 @@ fn bench_adtw(c: &mut Criterion) {
             |b, (train, test, weight)| {
                 b.iter(|| {
                     let (device, queue, sba, sda, ma) = get_device();
-                    black_box(adtw(device, queue, sba, sda, ma, train, test, *weight))
+                    black_box(adtw(device, queue, sba, sda, ma, train, test, 1.0, *weight))
                 });
             },
         );
@@ -259,7 +261,16 @@ fn bench_all_distances_comparison(c: &mut Criterion) {
     group.bench_function("DTW", |b| {
         b.iter(|| {
             let (device, queue, sba, sda, ma) = get_device();
-            black_box(dtw(device, queue, sba, sda, ma, &train_data, &test_data))
+            black_box(dtw(
+                device,
+                queue,
+                sba,
+                sda,
+                ma,
+                &train_data,
+                &test_data,
+                1.0,
+            ))
         });
     });
 
@@ -274,6 +285,7 @@ fn bench_all_distances_comparison(c: &mut Criterion) {
                 ma,
                 &train_data,
                 &test_data,
+                1.0,
                 0.0,
             ))
         });
@@ -291,6 +303,7 @@ fn bench_all_distances_comparison(c: &mut Criterion) {
                 &train_data,
                 &test_data,
                 1.0,
+                1.0,
             ))
         });
     });
@@ -298,7 +311,16 @@ fn bench_all_distances_comparison(c: &mut Criterion) {
     group.bench_function("MSM", |b| {
         b.iter(|| {
             let (device, queue, sba, sda, ma) = get_device();
-            black_box(msm(device, queue, sba, sda, ma, &train_data, &test_data))
+            black_box(msm(
+                device,
+                queue,
+                sba,
+                sda,
+                ma,
+                &train_data,
+                &test_data,
+                1.0,
+            ))
         });
     });
 
@@ -313,6 +335,7 @@ fn bench_all_distances_comparison(c: &mut Criterion) {
                 ma,
                 &train_data,
                 &test_data,
+                1.0,
                 0.001,
                 1.0,
             ))
@@ -330,6 +353,7 @@ fn bench_all_distances_comparison(c: &mut Criterion) {
                 ma,
                 &train_data,
                 &test_data,
+                1.0,
                 &weights,
             ))
         });
@@ -346,6 +370,7 @@ fn bench_all_distances_comparison(c: &mut Criterion) {
                 ma,
                 &train_data,
                 &test_data,
+                1.0,
                 0.1,
             ))
         });

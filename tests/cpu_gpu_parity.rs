@@ -167,6 +167,69 @@ fn gpu_matches_cpu_across_shapes() {
     }
 }
 
+/// Series whose lengths differ by a large factor.
+///
+/// The CPU backend prunes cells that exceed an upper bound estimated by walking the
+/// diagonal and then the last row. That estimate used the wrong predecessor for the
+/// horizontal segment, so for ERP/MSM/TWE it was not an upper bound at all -- too low, it
+/// pruned the optimum, the band collapsed and the function returned `inf` from a ratio of
+/// about 2.5 upwards. The GPU does no pruning, so agreeing with it here is what
+/// establishes that the bound is valid rather than merely finite.
+#[test]
+fn gpu_matches_cpu_at_large_length_ratios() {
+    for &(la, lb) in &[
+        (64usize, 160usize),
+        (64, 192),
+        (64, 256),
+        (64, 512),
+        (32, 96),
+        (100, 300),
+        (37, 200),
+    ] {
+        let x = make_series(2, la, 1);
+        let y = make_series(2, lb, 2);
+        let (p, q) = (x.as_slice(), Some(y.as_slice()));
+        let s = &format!("len {la}/{lb} ({:.1}x)", lb as f64 / la as f64);
+
+        check(
+            "DTW",
+            s,
+            &core::dtw(p, q, 1.0, false, "gpu").unwrap(),
+            &core::dtw(p, q, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "ERP",
+            s,
+            &core::erp(p, q, 1.0, 0.0, false, "gpu").unwrap(),
+            &core::erp(p, q, 1.0, 0.0, false, "cpu").unwrap(),
+        );
+        check(
+            "MSM",
+            s,
+            &core::msm(p, q, 1.0, false, "gpu").unwrap(),
+            &core::msm(p, q, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "TWE",
+            s,
+            &core::twe(p, q, 1.0, 0.001, 1.0, false, "gpu").unwrap(),
+            &core::twe(p, q, 1.0, 0.001, 1.0, false, "cpu").unwrap(),
+        );
+        check(
+            "WDTW",
+            s,
+            &core::wdtw(p, q, 1.0, 0.05, false, "gpu").unwrap(),
+            &core::wdtw(p, q, 1.0, 0.05, false, "cpu").unwrap(),
+        );
+        check(
+            "ADTW",
+            s,
+            &core::adtw(p, q, 1.0, 0.1, false, "gpu").unwrap(),
+            &core::adtw(p, q, 1.0, 0.1, false, "cpu").unwrap(),
+        );
+    }
+}
+
 /// A self-distance matrix must be symmetric with a zero diagonal. Independent of the CPU
 /// backend, so this still holds where the CPU backend's own upper-bound pruning gives up
 /// (`diagonal.rs` returns `inf` for MSM/TWE once the two lengths differ by 3x or more).

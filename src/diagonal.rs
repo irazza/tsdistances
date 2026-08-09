@@ -41,7 +41,19 @@ fn diagonal_distance_<M: Matrix>(
 
         if b_len > a_len {
             for i in min_len as usize..b_len {
-                distance = dist_lambda(a_len - 1, i, f64::INFINITY, f64::INFINITY, distance);
+                // The running cost belongs in `x`, not `z`. This segment walks *along a
+                // row* -- `j` advances while `i` stays put -- so its predecessor is
+                // `(i, j-1)`, which the lambdas receive as `x` (`dleft`); `z` is `dup`,
+                // the cell above, which this path never steps through.
+                //
+                // Feeding it as `z` made the lambdas price a vertical move: ERP charged
+                // `|a_i - gap|` instead of `|b_j - gap|`, MSM and TWE the wrong one of
+                // their two split/delete terms. The result was not an upper bound at all,
+                // and being too low it pruned the optimum away -- the band collapsed and
+                // the function returned `inf`. DTW, WDTW and ADTW were immune only by
+                // accident: their cost is `dist + min(x, y, z)`, so with two infinities it
+                // does not matter which slot holds the finite value.
+                distance = dist_lambda(a_len - 1, i, distance, f64::INFINITY, f64::INFINITY);
             }
         }
 

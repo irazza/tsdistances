@@ -230,6 +230,34 @@ fn gpu_matches_cpu_at_large_length_ratios() {
     }
 }
 
+/// Exactly one diamond per workgroup. This is a correctness invariant, not a tuning knob.
+///
+/// The wavefront barrier has Workgroup *execution* scope and sits inside a loop whose trip
+/// count is `diag_count`, which depends on how much of the matrix a given diamond covers.
+/// A workgroup spanning several diamonds would therefore have invocations running
+/// different numbers of iterations, leaving some short of a barrier the others are waiting
+/// on -- undefined behaviour. That is precisely what the kernel used to do, with a
+/// workgroup of `max_compute_work_group_size[0]` (1024) covering 16 diamonds; AMD
+/// tolerated it and lavapipe produced garbage at every length.
+///
+/// This assertion exists because **nothing else catches a regression here**. Widening the
+/// workgroup again passes every numerical test in this file on both drivers available
+/// locally: the divergence only bites for edge diamonds whose `diag_count` is clipped, so
+/// it stays latent until some other GPU or input shape exposes it. Verified by
+/// re-widening the workgroup and watching the rest of the suite stay green.
+#[test]
+fn kernels_run_one_diamond_per_workgroup() {
+    let (device, ..) = tsdistances_gpu::utils::get_device();
+    let tile = tsdistances_gpu::utils::compute_tile_width(&device);
+    let workgroup = tsdistances_gpu::utils::compute_workgroup_size(&device, tile);
+    assert_eq!(
+        workgroup as usize, tile,
+        "a workgroup must be exactly one diamond ({tile} invocations), got {workgroup}; \
+         a wider workgroup puts the wavefront barrier in divergent control flow, which is \
+         undefined and which the numerical tests will not catch"
+    );
+}
+
 /// A self-distance matrix must be symmetric with a zero diagonal. Independent of the CPU
 /// backend, so this still holds where the CPU backend's own upper-bound pruning gives up
 /// (`diagonal.rs` returns `inf` for MSM/TWE once the two lengths differ by 3x or more).

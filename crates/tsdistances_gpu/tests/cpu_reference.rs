@@ -83,8 +83,12 @@ pub fn lcss_cpu(a: &[f32], b: &[f32], epsilon: f32) -> f32 {
 pub fn msm_cpu(a: &[f32], b: &[f32]) -> f32 {
     const C: f32 = 1.0;
 
+    // `x - y.max(z)`, not `x - z.max(x)`: the latter is `<= 0` for every input, so it
+    // never contributes. This reference carried the same typo as the GPU kernel it was
+    // meant to check, which is precisely why the mismatch survived. Matches
+    // `tsdistances::utils::msm_cost_function`.
     fn cost_function(x: f32, y: f32, z: f32) -> f32 {
-        C + (((y.min(z) - x).max(x - z.max(x))).max(0.0))
+        C + (((y.min(z) - x).max(x - y.max(z))).max(0.0))
     }
 
     let n = a.len();

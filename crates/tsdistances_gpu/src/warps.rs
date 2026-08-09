@@ -4,7 +4,7 @@ use crate::{
     kernels::kernel_trait::GpuKernelImpl,
     utils::{
         CommandBufferPool, SubBufferPair, SubBuffersAllocator, compute_optimized_diag_len,
-        next_multiple_of_n,
+        compute_tile_width, next_multiple_of_n,
     },
 };
 use std::cmp::max;
@@ -53,21 +53,30 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
     b: &Vec<Vec<f32>>,
     init_val: f32,
 ) -> Vec<Vec<f32>> {
-    let (a, b) = if compute_sample_len(a) > compute_sample_len(b) {
-        (b, a)
-    } else {
-        (a, b)
-    };
+    // The wavefront requires the shorter series on the `a` axis, so the inputs are swapped
+    // when `a` is the larger. Everything below then works in swapped orientation and
+    // produces a `b_count x a_count` matrix -- which must be transposed back before
+    // returning, or callers silently get `d(b[i], a[j])` where they asked for
+    // `d(a[i], b[j])`. For non-square inputs the returned matrix even had the wrong shape.
+    let swapped = compute_sample_len(a) > compute_sample_len(b);
+    let (a, b) = if swapped { (b, a) } else { (a, b) };
 
     let properties = device.physical_device().properties();
-    let max_subgroup_size = properties.max_subgroup_size.unwrap() as usize;
+    let max_subgroup_size = compute_tile_width(&device);
     let max_storage_buffer_size =
         properties.max_storage_buffer_range as usize / std::mem::size_of::<f32>();
 
+    // `*_len` is the true series length and bounds the DP; `*_stride` is that length
+    // rounded up to a whole tile and is only the row pitch of the flattened buffers.
+    // Conflating the two is what made the wavefront run the recurrence across the zero
+    // padding and report the padded corner as the answer -- i.e. every distance was wrong
+    // whenever a series length was not an exact multiple of the subgroup size.
     let a_count = a.len();
-    let a_len = next_multiple_of_n(a.first().unwrap().len(), max_subgroup_size);
+    let a_len = a.first().unwrap().len();
     let b_count = b.len();
-    let b_len = next_multiple_of_n(b.first().unwrap().len(), max_subgroup_size);
+    let b_len = b.first().unwrap().len();
+    let a_stride = next_multiple_of_n(a_len, max_subgroup_size);
+    let b_stride = next_multiple_of_n(b_len, max_subgroup_size);
     let len = max(a_len, b_len);
 
     let a_padded = flatten_and_pad(a, max_subgroup_size);
@@ -93,8 +102,8 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
         subbuffer_allocator.clone(),
         a_chunk as u64,
         b_chunk as u64,
-        a_len as u64,
-        b_len as u64,
+        a_stride as u64,
+        b_stride as u64,
         diag_len as u64,
         command_pool,
     );
@@ -105,8 +114,9 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
         for b_start in (0..b_count).step_by(b_chunk) {
             let b_end = (b_start + b_chunk).min(b_count);
 
-            let a_sub = &a_padded[a_start * a_len..a_end * a_len];
-            let b_sub = &b_padded[b_start * b_len..b_end * b_len];
+            // Slicing uses the stride: that is the physical layout of `flatten_and_pad`.
+            let a_sub = &a_padded[a_start * a_stride..a_end * a_stride];
+            let b_sub = &b_padded[b_start * b_stride..b_end * b_stride];
 
             dp_buffers.diamond_partitioning_gpu(
                 device.clone(),
@@ -118,6 +128,8 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
                 max_subgroup_size,
                 a_len,
                 b_len,
+                a_stride,
+                b_stride,
                 a_sub,
                 b_sub,
                 a_end - a_start,
@@ -131,7 +143,17 @@ pub fn diamond_partitioning_gpu<G: GpuKernelImpl>(
 
     subbuffer_allocator.clear_with_size(0);
 
-    // panic!("dist matrix {:?}", &dist_matrix[..5].iter().map(|r| &r[..5]).collect::<Vec<_>>());
+    // Undo the input swap: `dist_matrix` is `b_count x a_count` in caller terms.
+    if swapped {
+        let mut transposed = vec![vec![0f32; a_count]; b_count];
+        for (i, row) in dist_matrix.iter().enumerate() {
+            for (j, &value) in row.iter().enumerate() {
+                transposed[j][i] = value;
+            }
+        }
+        return transposed;
+    }
+
     dist_matrix
 }
 
@@ -202,6 +224,8 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
         max_subgroup_threads: usize,
         a_len: usize,
         b_len: usize,
+        a_stride: usize,
+        b_stride: usize,
         a_padded: &[f32],
         b_padded: &[f32],
         a_count: usize,
@@ -233,7 +257,15 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
         let n_tiles_in_a = a_len.div_ceil(max_subgroup_threads);
         let n_tiles_in_b = b_len.div_ceil(max_subgroup_threads);
 
-        let rows_count = (a_len + b_len).div_ceil(max_subgroup_threads) - 1;
+        // One dispatch per antidiagonal of the tile grid. An `n_tiles_in_a x n_tiles_in_b`
+        // grid has exactly `n_tiles_in_a + n_tiles_in_b - 1` of them.
+        //
+        // This was `(a_len + b_len).div_ceil(tile) - 1`, which agrees only when both
+        // lengths are exact multiples of the tile -- the case the old zero-padding always
+        // forced. With true lengths it undercounts (65/65 needs 3 rows, that gives 2) and
+        // for any pair shorter than one tile it yields 0, dispatching nothing at all and
+        // leaving the result at its initial value.
+        let rows_count = n_tiles_in_a + n_tiles_in_b - 1;
 
         let mut diamonds_count = 1;
         let mut first_coord = -(max_subgroup_threads as isize);
@@ -276,6 +308,8 @@ impl<G: GpuKernelImpl> DiamondPartitioning<G> {
                 b_start as u64,
                 a_len as u64,
                 b_len as u64,
+                a_stride as u64,
+                b_stride as u64,
                 max_subgroup_threads as u64,
                 &a_gpu,
                 &b_gpu,

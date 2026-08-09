@@ -70,6 +70,7 @@ fn test_erp_distance() {
         ma.clone(),
         &train_data,
         &test_data,
+        1.0,
         0.0,
     );
     let elapsed_time = start_time.elapsed();
@@ -93,6 +94,7 @@ fn test_lcss_distance() {
         ma.clone(),
         &train_data,
         &test_data,
+        1.0,
         epsilon,
     );
     let elapsed = start.elapsed();
@@ -120,6 +122,7 @@ fn test_dtw_distance() {
         ma.clone(),
         &train_data,
         &test_data,
+        1.0,
     );
     let elapsed_time = start_time.elapsed();
     println!("DTW elapsed time: {:?}", elapsed_time);
@@ -145,6 +148,7 @@ fn test_wdtw_distance() {
         ma.clone(),
         &train_data,
         &test_data,
+        1.0,
         &weights,
     );
     let elapsed_time = start.elapsed();
@@ -170,6 +174,7 @@ fn test_adtw_distance() {
         ma.clone(),
         &train_data,
         &test_data,
+        1.0,
         w,
     );
     let elapsed_time = start_time.elapsed();
@@ -193,6 +198,7 @@ fn test_msm_distance() {
         ma.clone(),
         &train_data,
         &test_data,
+        1.0,
     );
     let elapsed_time = start_time.elapsed();
     println!("MSM elapsed time: {:?}", elapsed_time);
@@ -218,6 +224,7 @@ fn test_twe_distance() {
         ma.clone(),
         &train_data,
         &test_data,
+        1.0,
         stiffness,
         penalty,
     );

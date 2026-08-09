@@ -103,6 +103,8 @@ macro_rules! warp_kernel_spec {
                             a_stride: u64,
                             b_stride: u64,
                             max_subgroup_threads: u64,
+                            band: f32,
+                            init_val: f32,
                             a: &Subbuffer<[f32]>,
                             b: &Subbuffer<[f32]>,
                             diagonal: &mut Subbuffer<[f32]>,
@@ -167,6 +169,8 @@ macro_rules! warp_kernel_spec {
                                     b_count: b_count as u32,
                                     diag_len: diag_len as u32,
                                     max_subgroup_threads: max_subgroup_threads as u32,
+                                    band,
+                                    init_val,
                                     $(param1: self.$param1,)?
                                     $(param2: self.$param2,)?
                                     $(param3: self.$param3,)?
@@ -224,6 +228,10 @@ macro_rules! warp_kernel_spec {
                     b_count: u32,
                     diag_len: u32,
                     max_subgroup_threads: u32,
+                    // `band` is the Sakoe-Chiba band as a fraction of `a_len` (`>= 1.0`
+                    // disables it); `init_val` is what the CPU leaves outside the band.
+                    band: f32,
+                    init_val: f32,
                     $(param1: $ty1,)?
                     $(param2: $ty2,)?
                     $(param3: $ty3,)?
@@ -248,6 +256,10 @@ macro_rules! warp_kernel_spec {
                     diag_count: u32,
                     warp: u32,
                     max_subgroup_threads: u32,
+                    a_len: u32,
+                    b_len: u32,
+                    band: f32,
+                    init_val: f32,
                     $a: &[f32],
                     $b: &[f32],
                     $a_offset: usize,
@@ -280,9 +292,31 @@ macro_rules! warp_kernel_spec {
                             let $y = matrix.get_diagonal_cell(d_offset + d - 2, k);
                             let $z = matrix.get_diagonal_cell(d_offset + d - 1, k + 1);
 
+                            // Sakoe-Chiba band. `src/diagonal.rs` keeps only the offsets in
+                            // `[floor(mid - band_size), ceil(mid + band_size)]` on each
+                            // anti-diagonal, where `mid` interpolates linearly from 0 to
+                            // `b_len - a_len` and `band_size = band * a_len`; everything
+                            // outside is set to `init_val`. Reproduced here so `device="gpu"`
+                            // honours the parameter -- it used to ignore it entirely and
+                            // silently return the *unbanded* distance.
+                            //
+                            // Rearranged to avoid `floor`/`ceil` and the division: for
+                            // integer `k`, `k >= floor(x)` is `x < k + 1` and `k <= ceil(y)`
+                            // is `y > k - 1`. Multiplying through by the (positive) span
+                            // leaves everything but the band term integral, so f32 rounding
+                            // cannot shift a boundary by a whole cell.
+                            let in_band = band >= 1.0 || {
+                                let span = (a_len + b_len) as i32;
+                                let drift = (b_len as i32 - a_len as i32) * ($i + $j + 2) as i32;
+                                let half = band * a_len as f32 * span as f32;
+                                (drift as f32) - half < ((k + 1) * span) as f32
+                                    && (drift as f32) + half > ((k - 1) * span) as f32
+                            };
 
-                            let value = {
+                            let value = if in_band {
                                 $body
+                            } else {
+                                init_val
                             };
 
                             matrix.set_diagonal_cell(d_offset + d, k, value);
@@ -335,6 +369,8 @@ macro_rules! warp_kernel_spec {
                     a_len: u32,
                     b_len: u32,
                     max_subgroup_threads: u32,
+                    band: f32,
+                    init_val: f32,
                     diagonal: &mut [f32],
                     diagonal_offset: u32,
                     diagonal_len: u32,
@@ -384,6 +420,10 @@ macro_rules! warp_kernel_spec {
                         (max_subgroup_threads * 2 + 1).min(alen + blen + 1),
                         warp_id,
                         max_subgroup_threads,
+                        a_len,
+                        b_len,
+                        band,
+                        init_val,
                         $a,
                         $b,
                         $a_offset,
@@ -452,6 +492,8 @@ macro_rules! warp_kernel_spec {
                         constants.a_len,
                         constants.b_len,
                         constants.max_subgroup_threads,
+                        constants.band,
+                        constants.init_val,
                         diagonal,
                         diagonal_offset,
                         constants.diag_len,
@@ -508,6 +550,10 @@ pub mod kernel_trait {
             a_stride: u64,
             b_stride: u64,
             max_subgroup_threads: u64,
+            // Sakoe-Chiba band as a fraction of `a_len` (`>= 1.0` disables it), and the
+            // value the CPU backend leaves in cells outside it.
+            band: f32,
+            init_val: f32,
             a: &Subbuffer<[f32]>,
             b: &Subbuffer<[f32]>,
             diagonal: &mut Subbuffer<[f32]>,

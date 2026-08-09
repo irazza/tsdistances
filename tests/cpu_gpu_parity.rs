@@ -230,6 +230,55 @@ fn gpu_matches_cpu_at_large_length_ratios() {
     }
 }
 
+/// The Sakoe-Chiba band must constrain the GPU exactly as it constrains the CPU.
+///
+/// The GPU backend used to ignore `sakoe_chiba_band` outright -- the kernels had no notion
+/// of it -- so `device="gpu"` silently returned the *unbanded* distance for any band. It
+/// looked correct at moderate bands only because the optimal path happened to fall inside
+/// them, which made the disagreement data-dependent rather than obvious.
+///
+/// Note the second assertion. Parity alone would pass vacuously if *both* backends ignored
+/// the parameter, so this also requires a tight band to actually change the answer.
+#[test]
+fn gpu_honours_sakoe_chiba_band() {
+    for &len in &[64usize, 100, 128] {
+        let x = make_series(2, len, 1);
+        let y = make_series(2, len, 2);
+        let (p, q) = (x.as_slice(), Some(y.as_slice()));
+
+        for &band in &[1.0f64, 0.8, 0.5, 0.3, 0.2, 0.1, 0.05] {
+            let s = &format!("len {len}, band {band}");
+            check(
+                "DTW",
+                s,
+                &core::dtw(p, q, band, false, "gpu").unwrap(),
+                &core::dtw(p, q, band, false, "cpu").unwrap(),
+            );
+            check(
+                "MSM",
+                s,
+                &core::msm(p, q, band, false, "gpu").unwrap(),
+                &core::msm(p, q, band, false, "cpu").unwrap(),
+            );
+            check(
+                "ERP",
+                s,
+                &core::erp(p, q, band, 0.0, false, "gpu").unwrap(),
+                &core::erp(p, q, band, 0.0, false, "cpu").unwrap(),
+            );
+        }
+
+        // The band must bite, or the parity above proves nothing.
+        let wide = core::dtw(p, q, 1.0, false, "gpu").unwrap()[0][0];
+        let tight = core::dtw(p, q, 0.05, false, "gpu").unwrap()[0][0];
+        assert!(
+            tight > wide,
+            "len {len}: a 0.05 band left the GPU result unchanged ({tight} vs {wide}), so the \
+             constraint is being ignored -- exactly the bug this test exists for"
+        );
+    }
+}
+
 /// Exactly one diamond per workgroup. This is a correctness invariant, not a tuning knob.
 ///
 /// The wavefront barrier has Workgroup *execution* scope and sits inside a loop whose trip

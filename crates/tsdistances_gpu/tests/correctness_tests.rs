@@ -45,7 +45,7 @@ fn test_dtw_identity() {
     let data = generate_simple_test_data(5, 64);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = dtw(device, queue, sba, sda, ma, &data, &data);
+    let result = dtw(device, queue, sba, sda, ma, &data, &data, 1.0);
 
     // Diagonal should be 0 (distance to self)
     for i in 0..data.len() {
@@ -76,10 +76,11 @@ fn test_dtw_symmetry() {
         ma.clone(),
         &a_data,
         &b_data,
+        1.0,
     );
 
     let (device, queue, sba, sda, ma) = get_device();
-    let ba_result = dtw(device, queue, sba, sda, ma, &b_data, &a_data);
+    let ba_result = dtw(device, queue, sba, sda, ma, &b_data, &a_data, 1.0);
 
     for i in 0..a_data.len() {
         for j in 0..b_data.len() {
@@ -106,7 +107,7 @@ fn test_dtw_non_negative() {
     let test_data = generate_simple_test_data(8, 64);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = dtw(device, queue, sba, sda, ma, &train_data, &test_data);
+    let result = dtw(device, queue, sba, sda, ma, &train_data, &test_data, 1.0);
 
     for (i, row) in result.iter().enumerate() {
         for (j, &val) in row.iter().enumerate() {
@@ -129,7 +130,7 @@ fn test_erp_identity() {
     let data = generate_simple_test_data(5, 64);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = erp(device, queue, sba, sda, ma, &data, &data, 0.0);
+    let result = erp(device, queue, sba, sda, ma, &data, &data, 1.0, 0.0);
 
     for i in 0..data.len() {
         assert!(
@@ -150,7 +151,7 @@ fn test_lcss_identity() {
     let data = generate_simple_test_data(5, 64);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = lcss(device, queue, sba, sda, ma, &data, &data, 1.0);
+    let result = lcss(device, queue, sba, sda, ma, &data, &data, 1.0, 1.0);
 
     // For identical sequences with epsilon=1.0, distance should be 0
     for i in 0..data.len() {
@@ -172,7 +173,7 @@ fn test_msm_identity() {
     let data = generate_simple_test_data(5, 64);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = msm(device, queue, sba, sda, ma, &data, &data);
+    let result = msm(device, queue, sba, sda, ma, &data, &data, 1.0);
 
     for i in 0..data.len() {
         assert!(
@@ -193,7 +194,7 @@ fn test_twe_identity() {
     let data = generate_simple_test_data(5, 64);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = twe(device, queue, sba, sda, ma, &data, &data, 0.001, 1.0);
+    let result = twe(device, queue, sba, sda, ma, &data, &data, 1.0, 0.001, 1.0);
 
     for i in 0..data.len() {
         assert!(
@@ -215,7 +216,7 @@ fn test_wdtw_identity() {
     let weights = dtw_weights(64, 0.05);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = wdtw(device, queue, sba, sda, ma, &data, &data, &weights);
+    let result = wdtw(device, queue, sba, sda, ma, &data, &data, 1.0, &weights);
 
     for i in 0..data.len() {
         assert!(
@@ -236,7 +237,7 @@ fn test_adtw_identity() {
     let data = generate_simple_test_data(5, 64);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result = adtw(device, queue, sba, sda, ma, &data, &data, 0.1);
+    let result = adtw(device, queue, sba, sda, ma, &data, &data, 1.0, 0.1);
 
     for i in 0..data.len() {
         assert!(
@@ -259,10 +260,10 @@ fn test_dtw_consistency() {
     let test_data = generate_simple_test_data(10, 64); // Same size to avoid swap issues
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result1 = dtw(device, queue, sba, sda, ma, &train_data, &test_data);
+    let result1 = dtw(device, queue, sba, sda, ma, &train_data, &test_data, 1.0);
 
     let (device, queue, sba, sda, ma) = get_device();
-    let result2 = dtw(device, queue, sba, sda, ma, &train_data, &test_data);
+    let result2 = dtw(device, queue, sba, sda, ma, &train_data, &test_data, 1.0);
 
     for i in 0..result1.len() {
         for j in 0..result1[i].len() {
@@ -295,7 +296,7 @@ fn test_various_sizes() {
         let data = generate_simple_test_data(*num_series, *series_len);
 
         let (device, queue, sba, sda, ma) = get_device();
-        let result = dtw(device, queue, sba, sda, ma, &data, &data);
+        let result = dtw(device, queue, sba, sda, ma, &data, &data, 1.0);
 
         // Check diagonal is zero
         for i in 0..data.len() {
@@ -324,7 +325,7 @@ fn test_results_finite() {
 
     // Test all distance functions
     let (d, q, s, ds, m) = get_device();
-    let result = dtw(d, q, s, ds, m, &train_data, &test_data);
+    let result = dtw(d, q, s, ds, m, &train_data, &test_data, 1.0);
     for row in &result {
         for &val in row {
             assert!(val.is_finite(), "DTW produced non-finite value: {}", val);
@@ -332,7 +333,7 @@ fn test_results_finite() {
     }
 
     let (d, q, s, ds, m) = get_device();
-    let result = erp(d, q, s, ds, m, &train_data, &test_data, 0.0);
+    let result = erp(d, q, s, ds, m, &train_data, &test_data, 1.0, 0.0);
     for row in &result {
         for &val in row {
             assert!(val.is_finite(), "ERP produced non-finite value: {}", val);
@@ -340,7 +341,7 @@ fn test_results_finite() {
     }
 
     let (d, q, s, ds, m) = get_device();
-    let result = msm(d, q, s, ds, m, &train_data, &test_data);
+    let result = msm(d, q, s, ds, m, &train_data, &test_data, 1.0);
     for row in &result {
         for &val in row {
             assert!(val.is_finite(), "MSM produced non-finite value: {}", val);
@@ -348,7 +349,7 @@ fn test_results_finite() {
     }
 
     let (d, q, s, ds, m) = get_device();
-    let result = wdtw(d, q, s, ds, m, &train_data, &test_data, &weights);
+    let result = wdtw(d, q, s, ds, m, &train_data, &test_data, 1.0, &weights);
     for row in &result {
         for &val in row {
             assert!(val.is_finite(), "WDTW produced non-finite value: {}", val);
@@ -356,7 +357,7 @@ fn test_results_finite() {
     }
 
     let (d, q, s, ds, m) = get_device();
-    let result = adtw(d, q, s, ds, m, &train_data, &test_data, 0.1);
+    let result = adtw(d, q, s, ds, m, &train_data, &test_data, 1.0, 0.1);
     for row in &result {
         for &val in row {
             assert!(val.is_finite(), "ADTW produced non-finite value: {}", val);

@@ -46,6 +46,7 @@ pub mod cpu {
         sa: SubBuffersAllocator,
         a: &Vec<Vec<f32>>,
         b: &Vec<Vec<f32>>,
+        band: f32,
         gap_penalty: f32,
     ) -> Vec<Vec<f32>> {
         diamond_partitioning_gpu::<_>(
@@ -58,6 +59,7 @@ pub mod cpu {
             a,
             b,
             f32::INFINITY,
+            band,
         )
     }
 
@@ -69,6 +71,7 @@ pub mod cpu {
         sa: SubBuffersAllocator,
         a: &Vec<Vec<f32>>,
         b: &Vec<Vec<f32>>,
+        band: f32,
         epsilon: f32,
     ) -> Vec<Vec<f32>> {
         let a_len = a.first().unwrap().len();
@@ -83,6 +86,7 @@ pub mod cpu {
             a,
             b,
             0.0,
+            band,
         );
         let min_len = min(a_len, b_len) as f32;
         similarity
@@ -99,8 +103,20 @@ pub mod cpu {
         sa: SubBuffersAllocator,
         a: &Vec<Vec<f32>>,
         b: &Vec<Vec<f32>>,
+        band: f32,
     ) -> Vec<Vec<f32>> {
-        diamond_partitioning_gpu::<_>(device, queue, sba, dsa, sa, DTWImpl {}, a, b, f32::INFINITY)
+        diamond_partitioning_gpu::<_>(
+            device,
+            queue,
+            sba,
+            dsa,
+            sa,
+            DTWImpl {},
+            a,
+            b,
+            f32::INFINITY,
+            band,
+        )
     }
 
     pub fn wdtw(
@@ -111,6 +127,7 @@ pub mod cpu {
         sa: SubBuffersAllocator,
         a: &Vec<Vec<f32>>,
         b: &Vec<Vec<f32>>,
+        band: f32,
         weights: &[f32],
     ) -> Vec<Vec<f32>> {
         diamond_partitioning_gpu::<_>(
@@ -125,6 +142,7 @@ pub mod cpu {
             a,
             b,
             f32::INFINITY,
+            band,
         )
     }
 
@@ -136,8 +154,20 @@ pub mod cpu {
         sa: SubBuffersAllocator,
         a: &Vec<Vec<f32>>,
         b: &Vec<Vec<f32>>,
+        band: f32,
     ) -> Vec<Vec<f32>> {
-        diamond_partitioning_gpu::<_>(device, queue, sba, dsa, sa, MSMImpl {}, a, b, f32::INFINITY)
+        diamond_partitioning_gpu::<_>(
+            device,
+            queue,
+            sba,
+            dsa,
+            sa,
+            MSMImpl {},
+            a,
+            b,
+            f32::INFINITY,
+            band,
+        )
     }
 
     pub fn twe(
@@ -148,6 +178,7 @@ pub mod cpu {
         sa: SubBuffersAllocator,
         a: &Vec<Vec<f32>>,
         b: &Vec<Vec<f32>>,
+        band: f32,
         stiffness: f32,
         penalty: f32,
     ) -> Vec<Vec<f32>> {
@@ -161,6 +192,7 @@ pub mod cpu {
             a,
             b,
             f32::INFINITY,
+            band,
         )
     }
 
@@ -172,6 +204,7 @@ pub mod cpu {
         sa: SubBuffersAllocator,
         a: &Vec<Vec<f32>>,
         b: &Vec<Vec<f32>>,
+        band: f32,
         w: f32,
     ) -> Vec<Vec<f32>> {
         diamond_partitioning_gpu::<_>(
@@ -184,6 +217,7 @@ pub mod cpu {
             a,
             b,
             f32::INFINITY,
+            band,
         )
     }
 }
